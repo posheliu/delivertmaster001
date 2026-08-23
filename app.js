@@ -15,7 +15,7 @@ let sideMenuOpen = false;
 let mapInstance = null;
 let currentTileLayer = null;
 let userMarker = null;
-let currentLoc = [25.0645, 121.1928]; // 預設大園
+let currentLoc = [25.0478, 121.5170]; // 預設改為台北車站
 let geoWatchId = null;
 let hasCenteredMapInit = false; 
 
@@ -45,6 +45,16 @@ function injectNewStyles() {
         body:not(.map-enabled) .handle-bar-wrapper { display: none !important; }
         body:not(.map-enabled) .panel-header { cursor: default !important; }
         
+        /* ===== 未啟用滿版地圖時，隱藏左上角狀態列(漢堡)按鈕 ===== */
+        body:not(.map-enabled) #btn-menu { display: none !important; }
+        
+        /* ===== 保證 Leaflet 地圖在各裝置上絕對能顯示尺寸 ===== */
+        body.map-enabled #map {
+            display: block !important;
+            width: 100vw !important;
+            height: 100vh !important;
+        }
+
         /* ===== 啟用滿版地圖時，隱藏底部導航列 ===== */
         body.map-enabled .bottom-nav { display: none !important; }
 
@@ -73,32 +83,33 @@ function injectNewStyles() {
             -webkit-backdrop-filter: none !important;
             pointer-events: none; 
         }
-        body.map-enabled.on-home-view #btn-menu, 
+        body.map-enabled.on-home-view #btn-menu {
+            background: var(--card-bg) !important;
+            border-radius: 50% !important;
+            width: 44px !important;
+            height: 44px !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            pointer-events: auto !important;
+        }
         body.map-enabled.on-home-view #btn-back {
-            background: var(--card-bg);
-            border-radius: 50%;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            pointer-events: auto;
+            display: none !important; /* 強制隱藏不需要的箭頭 */
         }
         body.map-enabled.on-home-view #header-title-wrapper {
-            background: var(--card-bg);
-            padding: 8px 18px;
-            border-radius: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-            pointer-events: auto;
-            display: flex;
-            align-items: center;
+            background: var(--card-bg) !important;
+            padding: 8px 20px !important;
+            border-radius: 20px !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            pointer-events: auto !important;
         }
         body.map-enabled.on-home-view #btn-search {
-            pointer-events: auto;
+            pointer-events: auto !important;
         }
-        body.map-enabled.on-home-view #shift-status-badge {
-            margin-left: 6px;
+        body.map-enabled.on-home-view #shift-status-badge,
+        body.map-enabled.on-home-view #shift-status-badge-right {
+            display: none !important; /* 強制隱藏上線色塊 */
         }
     `;
     document.head.appendChild(style);
@@ -233,7 +244,7 @@ function initMap() {
         className: 'custom-blue-dot',
         html: `<div id="map-dir-marker" style="width: 18px; height: 18px; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
                   <!-- 梯形擴散光暈 -->
-                  <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 140px; height: 90px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center;"></div>
+                  <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 220px; height: 100px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center;"></div>
                </div>`,
         iconSize: [18, 18],
         iconAnchor: [9, 9]
@@ -252,7 +263,7 @@ function initMap() {
                     }
                 }
                 if (!hasCenteredMapInit) {
-                    recenterMap();
+                    recenterMap(true); // 第一次定位直接瞬間跳轉，不要動畫
                     hasCenteredMapInit = true;
                 } else if (mapInstance) {
                     const bounds = mapInstance.getBounds();
@@ -270,6 +281,9 @@ function initMap() {
         window.trafficTimer = setTimeout(loadFakeTraffic, 800);
     });
     setTimeout(loadFakeTraffic, 1000);
+    
+    // 確保地圖尺寸完全刷新，避免白畫面/灰畫面問題
+    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 500);
 }
 
 // 動態讀取 OSM 道路產生逼真且美觀的綠/黃/紅路況
@@ -331,14 +345,22 @@ function loadFakeTraffic() {
     });
 }
 
-function recenterMap() {
+// 支援瞬間跳轉或快速平滑移動
+function recenterMap(instant = false) {
     if (mapInstance && currentLoc) {
         const zoom = mapInstance.getZoom() || 15;
         const targetPoint = mapInstance.project(currentLoc, zoom);
         // 將中心點往下偏移1/4螢幕高度，這樣定位藍點就會跑在畫面「上半部」而不被下方拖曳區蓋住
         targetPoint.y += (window.innerHeight / 4); 
         const targetLatLng = mapInstance.unproject(targetPoint, zoom);
-        mapInstance.flyTo(targetLatLng, zoom, { animate: true, duration: 0.5 });
+        
+        if (instant) {
+            // 瞬間切換位置 (用於首次 GPS 定位)
+            mapInstance.setView(targetLatLng, zoom, { animate: false });
+        } else {
+            // 快速直線平移，取代原本緩慢的拋物線 flyTo
+            mapInstance.setView(targetLatLng, zoom, { animate: true, duration: 0.25 });
+        }
     }
 }
 
@@ -354,7 +376,7 @@ function initBottomPanel() {
         snapPoints = [
             70,             // 最高
             viewH * 0.5,    // 中間
-            viewH - 160     // 最低：稍微拉高，確保「提示那排字」完全露出
+            viewH - 160     // 最低：稍微拉高，確保「提示那排字」能完全露出
         ];
     }
 
@@ -822,12 +844,8 @@ function updateShiftUI() {
         
         if (currentViewIndex === 0) {
             if (isMapEnabled) {
-                // 滿版地圖：放名字下方，無底色
-                badgeCenter.style.display = 'inline-block';
-                badgeCenter.innerText = '上線中';
-                badgeCenter.style.background = 'transparent';
-                badgeCenter.style.color = 'var(--success)';
-                badgeCenter.style.border = 'none';
+                // 滿版地圖模式下，強制隱藏所有上線色塊 (維持畫面乾淨)
+                badgeCenter.style.display = 'none';
                 if (badgeRight) badgeRight.style.display = 'none';
             } else {
                 // 無滿版地圖：放右上角
@@ -1008,16 +1026,17 @@ function openOrderQuantityModal() {
 
 function updateActiveOrdersTitle() {
     const titleEl = document.getElementById('active-orders-title');
+    const hintEl = document.querySelector('#panel-drag-handle p');
     if (!titleEl) return;
     
- if (!activeShift || activeTimers.length === 0) {
-
+    if (activeTimers.length === 0) {
         titleEl.innerText = '目前沒有訂單...';
-
         titleEl.style.color = 'inherit';
+        if (hintEl) hintEl.innerText = '前往熱點地區將更有機會接到訂單';
     } else {
         titleEl.innerText = '進行中的訂單';
         titleEl.style.color = 'inherit';
+        if (hintEl) hintEl.innerText = '提示：長按卡片拖曳排序，往左滑動刪除，點擊標題綁定店家';
     }
 }
 
