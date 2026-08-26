@@ -1305,15 +1305,24 @@ function calculatePunctuality() {
         document.getElementById('punctuality-ontime').innerText = '--%';
         document.getElementById('punctuality-avg-timeout').innerText = '--%';
         document.getElementById('punctuality-total-timeout').innerText = '--%';
+        document.getElementById('punctuality-diff-amount').innerText = '$0.00';
         return;
     }
 
     let onTimeCount = 0, singleTimeoutRates = [], totalActual = 0, totalEstimatedWithBuffer = 0;
+    let totalActualAmount = 0, totalEstimatedAmount = 0; // 新增金額變數
+
     validRecords.forEach(r => {
         let limit = r.estimatedTime + buffer;
         let actual = r.durationMins;
         if (actual <= limit) { onTimeCount++; singleTimeoutRates.push(0); } else { singleTimeoutRates.push((actual - limit) / limit); }
         totalActual += actual; totalEstimatedWithBuffer += limit;
+        
+        // 計算實際金額與預估金額
+        totalActualAmount += r.amount;
+        let estAmt = (r.estimatedTime / 60) * RATE_PER_HOUR;
+        if (estAmt < MIN_AMOUNT) estAmt = MIN_AMOUNT;
+        totalEstimatedAmount += Number(estAmt.toFixed(2));
     });
 
     const onTimeRate = (onTimeCount / validRecords.length) * 100;
@@ -1321,10 +1330,15 @@ function calculatePunctuality() {
     let totalTimeoutRate = 0;
     if (totalActual > totalEstimatedWithBuffer && totalEstimatedWithBuffer > 0) { totalTimeoutRate = ((totalActual - totalEstimatedWithBuffer) / totalEstimatedWithBuffer) * 100; }
 
+    let diffAmount = totalActualAmount - totalEstimatedAmount;
+    if (diffAmount < 0) diffAmount = 0;
+
     document.getElementById('punctuality-ontime').innerText = onTimeRate.toFixed(1) + '%';
     document.getElementById('punctuality-avg-timeout').innerText = avgTimeoutRate.toFixed(1) + '%';
     document.getElementById('punctuality-total-timeout').innerText = totalTimeoutRate.toFixed(1) + '%';
+    document.getElementById('punctuality-diff-amount').innerText = fmtMoney(diffAmount); // 顯示補發金額
 }
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
 function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || k.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
+async function clearAllData() { if (await appConfirm(`確定要清除 [${currentUser}] 的所有紀錄嗎？\n（此動作無法復原）`, '警告', true)) { activeTimers = []; historyRecords = []; tipRecords = []; costRecords = []; shiftRecords = []; activeShift = null; waitRecords = []; activeWait = null; ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_shifts', 'order_active_shift', 'order_waits', 'order_active_wait'].forEach(k => localStorage.setItem(getStoreKey(k), k.includes('active') ? 'null' : '[]')); renderActiveTimers(); renderWeeklyData(); updateShiftUI(); checkWaitState(); await appAlert('清理完成', '成功'); } }
