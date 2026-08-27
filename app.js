@@ -364,6 +364,31 @@ function recenterMap(instant = false) {
     }
 }
 
+// 供外部呼叫更新 Header 透明度的函式
+window.updatePanelOpacity = function() {
+    if (currentViewIndex !== 0 || !document.body.classList.contains('map-enabled')) return;
+    const panel = document.getElementById('bottom-panel');
+    if (!panel) return;
+    const match = panel.style.transform.match(/translateY\(([-\d.]+)px\)/);
+    const y = match ? parseFloat(match[1]) : window.innerHeight * 0.5;
+    
+    // 當面板往上推近 80px 時，按鈕開始淡出
+    let opacity = Math.max(0, Math.min(1, y / 80));
+    
+    const els = [
+        document.getElementById('btn-menu'),
+        document.getElementById('header-title-wrapper'),
+        document.getElementById('btn-recenter')
+    ];
+    
+    els.forEach(el => {
+        if (el) {
+            el.style.opacity = opacity;
+            el.style.pointerEvents = opacity < 0.5 ? 'none' : 'auto';
+        }
+    });
+};
+
 function initBottomPanel() {
     const panel = document.getElementById('bottom-panel');
     const header = document.getElementById('panel-drag-handle');
@@ -375,9 +400,9 @@ function initBottomPanel() {
     function updatePanelDimensions() {
         let viewH = window.innerHeight;
         snapPoints = [
-            70,             // 最高
+            0,              // 最高：完全展開到最頂部 (Top 0)
             viewH * 0.5,    // 中間
-            viewH - 160     // 最低：稍微拉高，確保「提示那排字」能完全露出
+            viewH - 160     // 最低：確保「提示那排字」能完全露出
         ];
     }
 
@@ -419,6 +444,7 @@ function initBottomPanel() {
             if (newY < snapPoints[0]) newY = snapPoints[0] - (snapPoints[0] - newY) * 0.2; 
             if (newY > snapPoints[2]) newY = snapPoints[2] + (newY - snapPoints[2]) * 0.2;
             panel.style.transform = `translateY(${newY}px)`;
+            window.updatePanelOpacity();
         } 
         // 如果在內容區塊內滾動
         else if (e.target.closest('#panel-scroll-content')) {
@@ -456,6 +482,7 @@ function initBottomPanel() {
                 if (newY < snapPoints[0]) newY = snapPoints[0] - (snapPoints[0] - newY) * 0.2; 
                 if (newY > snapPoints[2]) newY = snapPoints[2] + (newY - snapPoints[2]) * 0.2;
                 panel.style.transform = `translateY(${newY}px)`;
+                window.updatePanelOpacity();
             } else if (isContentDragging) {
                 // 如果曾經在拖曳，但條件突然不成立（例如反向滑動），維持阻止預設行為以防畫面抖動
                 if (e.cancelable) e.preventDefault();
@@ -487,6 +514,7 @@ function initBottomPanel() {
         
         panel.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
         panel.style.transform = `translateY(${closest}px)`;
+        window.updatePanelOpacity();
         
         const contentEl = document.getElementById('panel-scroll-content');
         if (contentEl) contentEl.style.paddingBottom = `${closest + 40}px`;
@@ -502,6 +530,7 @@ function initBottomPanel() {
         if(document.body.classList.contains('map-enabled') && (!panel.style.transform || panel.style.transform === 'none')) {
             let initY = snapPoints[1];
             panel.style.transform = `translateY(${initY}px)`;
+            window.updatePanelOpacity();
             const contentEl = document.getElementById('panel-scroll-content');
             if (contentEl) contentEl.style.paddingBottom = `${initY + 40}px`;
         }
@@ -553,6 +582,7 @@ function applySettings() {
             if (panel && (!panel.style.transform || panel.style.transform === 'none')) {
                 const snapMiddle = window.innerHeight * 0.5;
                 panel.style.transform = `translateY(${snapMiddle}px)`;
+                window.updatePanelOpacity();
             }
         }
     } else {
@@ -832,8 +862,14 @@ function updateUIState() {
     const btnSearch = document.getElementById('btn-search');
     const btnBack = document.getElementById('btn-back');
     const btnMenu = document.getElementById('btn-menu');
+    const btnRecenter = document.getElementById('btn-recenter');
     const shiftBadge = document.getElementById('shift-status-badge');
     const shiftBadgeRight = document.getElementById('shift-status-badge-right');
+
+    // 清除行內透明度設定，以免切換頁面時按鈕被卡在透明狀態
+    if (btnMenu) { btnMenu.style.opacity = ''; btnMenu.style.pointerEvents = ''; }
+    if (titleWrapper) { titleWrapper.style.opacity = ''; titleWrapper.style.pointerEvents = ''; }
+    if (btnRecenter) { btnRecenter.style.opacity = ''; btnRecenter.style.pointerEvents = ''; }
 
     if (isSearchResultOpen || document.getElementById('view-daily-detail').classList.contains('active')) { 
         // 進入細節畫面時，移除透明化效果
@@ -851,6 +887,11 @@ function updateUIState() {
             titleWrapper.style.pointerEvents = 'auto'; titleWrapper.style.cursor = 'pointer'; 
             titleWrapper.onclick = () => openUserModal('switch');
             if (activeShift) updateShiftUI();
+            
+            // 重新評估首頁的動態透明度
+            if (typeof window.updatePanelOpacity === 'function') {
+                window.updatePanelOpacity();
+            }
         } else {
             // 切換至其他大分頁時，移除透明化效果
             document.body.classList.remove('on-home-view');
@@ -989,9 +1030,10 @@ async function stopTimer(id) {
     const index = activeTimers.findIndex(t => t.id === id); if (index === -1) return; 
     const timer = activeTimers[index], endTime = Date.now(), diffMins = Math.max(1, Math.round((endTime - timer.startTime) / 60000)); 
     const billableMins = Math.max(diffMins, timer.estimatedTime || 0);
-    let amount = (billableMins / 60) * RATE_PER_HOUR; if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+    let amount = Math.ceil((billableMins / 60) * RATE_PER_HOUR); // 改為無條件進位
+    if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
     const endDateObj = new Date(endTime); 
-    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
+    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
     activeTimers.splice(index, 1); 
     localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); 
     localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
@@ -1038,7 +1080,8 @@ function selectStore(storeName) {
 
 /* ================== 預估時間與刪除紀錄邏輯 ================== */
 async function setEstimatedTime(id) { closeAllSwipes(); const timer = activeTimers.find(t => t.id === id); if (!timer) return; const val = await appPrompt('請輸入預估時間 (分鐘):', timer.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { timer.estimatedTime = num; localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
-async function editHistoryEstimatedTime(id) { closeAllSwipes(); const record = historyRecords.find(r => r.id === id); if (!record) return; const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { record.estimatedTime = num; const billableMins = Math.max(record.durationMins, num); let amount = (billableMins / 60) * RATE_PER_HOUR; if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; record.amount = Number(amount.toFixed(2)); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
+async function editHistoryEstimatedTime(id) { closeAllSwipes(); const record = historyRecords.find(r => r.id === id); if (!record) return; const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { record.estimatedTime = num; const billableMins = Math.max(record.durationMins, num); let amount = Math.ceil((billableMins / 60) * RATE_PER_HOUR); // 改為無條件進位
+ if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; record.amount = Number(amount); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
 async function deleteHistoryRecord(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆收入紀錄嗎？', '刪除確認', true)) { historyRecords = historyRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } }
 
 /* ================== 卡片拖曳排序邏輯 ================== */
@@ -1265,9 +1308,51 @@ async function saveEdit() { const id = document.getElementById('edit-id').value,
 
 let currentCalDate = new Date(), calSelStart = null, calSelEnd = null;
 function openFilterModal() { calSelStart = null; calSelEnd = null; renderCalendar(); document.getElementById('filter-modal').classList.add('active'); } function closeModal(id) { document.getElementById(id).classList.remove('active'); } function calPrevMonth() { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); } function calNextMonth() { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); }
-function renderCalendar() { const y = currentCalDate.getFullYear(), m = currentCalDate.getMonth(); document.getElementById('cal-month-year').innerText = `${y}年${m + 1}月`; const firstDay = new Date(y, m, 1).getDay(), daysInMonth = new Date(y, m + 1, 0).getDate(), grid = document.getElementById('cal-days'); grid.innerHTML = ''; for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div class="cal-day empty"></div>`; for (let i = 1; i <= daysInMonth; i++) { const dayTime = new Date(y, m, i, 0, 0, 0).getTime(); let classes = 'cal-day'; if (calSelStart === dayTime || calSelEnd === dayTime) classes += ' selected'; if (calSelStart && calSelEnd && dayTime > calSelStart && dayTime < calSelEnd) classes += ' in-range'; grid.innerHTML += `<div class="${classes}" onclick="selectCalDate(${y}, ${m}, ${i})">${i}</div>`; } document.getElementById('cal-selection-text').innerText = !calSelStart ? '請點選開始日期' : (!calSelEnd ? '請點選結束日期 (單日請直接按確認)' : '已選擇範圍，請點擊確認查詢'); }
+
+function renderCalendar() { 
+    const y = currentCalDate.getFullYear(), m = currentCalDate.getMonth(); 
+    document.getElementById('cal-month-year').innerText = `${y}年${m + 1}月`; 
+    // getDay() 回傳: 0=日, 1=一, 2=二...
+    // 為了讓日曆從星期一開始，我們需要將「星期日」移到最後 (索引6)，其餘往前推
+    const firstDay = new Date(y, m, 1).getDay(); 
+    let emptyDays = firstDay === 0 ? 6 : firstDay - 1; 
+
+    const daysInMonth = new Date(y, m + 1, 0).getDate(); 
+    const grid = document.getElementById('cal-days'); 
+    grid.innerHTML = ''; 
+    
+    for (let i = 0; i < emptyDays; i++) grid.innerHTML += `<div class="cal-day empty"></div>`; 
+    for (let i = 1; i <= daysInMonth; i++) { 
+        const dayTime = new Date(y, m, i, 0, 0, 0).getTime(); 
+        let classes = 'cal-day'; 
+        if (calSelStart === dayTime || calSelEnd === dayTime) classes += ' selected'; 
+        if (calSelStart && calSelEnd && dayTime > calSelStart && dayTime < calSelEnd) classes += ' in-range'; 
+        grid.innerHTML += `<div class="${classes}" onclick="selectCalDate(${y}, ${m}, ${i})">${i}</div>`; 
+    } 
+    document.getElementById('cal-selection-text').innerText = !calSelStart ? '請點選開始日期' : (!calSelEnd ? '請點選結束日期 (單日請直接按確認)' : '已選擇範圍，請點擊確認查詢'); 
+}
+
 function selectCalDate(y, m, d) { const t = new Date(y, m, d, 0, 0, 0).getTime(); if (!calSelStart || (calSelStart && calSelEnd)) { calSelStart = t; calSelEnd = null; } else { if (t >= calSelStart) calSelEnd = t; else { calSelStart = t; calSelEnd = null; } } renderCalendar(); }
-async function applyFilter() { if (!calSelStart) return await appAlert('請先選擇日期', '操作錯誤'); const sTime = calSelStart, eTime = (calSelEnd || calSelStart) + 86399999; const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); document.getElementById('search-total-tips').innerText = fmtMoney(fTip.reduce((s, r)=>s+r.amount,0)); document.getElementById('search-total-costs').innerText = '-' + fmtMoney(fCost.reduce((s, r)=>s+r.amount,0)); const sd = new Date(sTime), ed = new Date(eTime), sStr = `${sd.getFullYear()}/${sd.getMonth()+1}/${sd.getDate()}`, eStr = `${ed.getFullYear()}/${ed.getMonth()+1}/${ed.getDate()}`; document.getElementById('search-date-range').innerText = sStr === eStr ? sStr : `${sStr} ~ ${eStr}`; renderStats(fInc, 'search-income-list'); renderTips(fTip, 'search-tips-list'); renderCosts(fCost, 'search-costs-list'); closeModal('filter-modal'); isSearchResultOpen = true; document.getElementById('view-search-result').classList.add('active'); updateUIState(); }
+
+async function applyFilter() { 
+    if (!calSelStart) return await appAlert('請先選擇日期', '操作錯誤'); 
+    const sTime = calSelStart, eTime = (calSelEnd || calSelStart) + 86399999; 
+    const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
+    
+    document.getElementById('search-total-orders').innerText = fInc.length + '張'; // 新增總單量顯示
+    document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); 
+    document.getElementById('search-total-tips').innerText = fmtMoney(fTip.reduce((s, r)=>s+r.amount,0)); 
+    document.getElementById('search-total-costs').innerText = '-' + fmtMoney(fCost.reduce((s, r)=>s+r.amount,0)); 
+    const sd = new Date(sTime), ed = new Date(eTime), sStr = `${sd.getFullYear()}/${sd.getMonth()+1}/${sd.getDate()}`, eStr = `${ed.getFullYear()}/${ed.getMonth()+1}/${ed.getDate()}`; 
+    document.getElementById('search-date-range').innerText = sStr === eStr ? sStr : `${sStr} ~ ${eStr}`; 
+    renderStats(fInc, 'search-income-list'); 
+    renderTips(fTip, 'search-tips-list'); 
+    renderCosts(fCost, 'search-costs-list'); 
+    closeModal('filter-modal'); 
+    isSearchResultOpen = true; 
+    document.getElementById('view-search-result').classList.add('active'); 
+    updateUIState(); 
+}
 
 /* ================== 準時率 / 兩週週期計算邏輯 ================== */
 function calculatePunctuality() {
@@ -1320,9 +1405,9 @@ function calculatePunctuality() {
         
         // 計算實際金額與預估金額
         totalActualAmount += r.amount;
-        let estAmt = (r.estimatedTime / 60) * RATE_PER_HOUR;
+        let estAmt = Math.ceil((r.estimatedTime / 60) * RATE_PER_HOUR); // 同步採用無條件進位
         if (estAmt < MIN_AMOUNT) estAmt = MIN_AMOUNT;
-        totalEstimatedAmount += Number(estAmt.toFixed(2));
+        totalEstimatedAmount += Number(estAmt);
     });
 
     const onTimeRate = (onTimeCount / validRecords.length) * 100;
@@ -1341,4 +1426,3 @@ function calculatePunctuality() {
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
 function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || k.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
-async function clearAllData() { if (await appConfirm(`確定要清除 [${currentUser}] 的所有紀錄嗎？\n（此動作無法復原）`, '警告', true)) { activeTimers = []; historyRecords = []; tipRecords = []; costRecords = []; shiftRecords = []; activeShift = null; waitRecords = []; activeWait = null; ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_shifts', 'order_active_shift', 'order_waits', 'order_active_wait'].forEach(k => localStorage.setItem(getStoreKey(k), k.includes('active') ? 'null' : '[]')); renderActiveTimers(); renderWeeklyData(); updateShiftUI(); checkWaitState(); await appAlert('清理完成', '成功'); } }
