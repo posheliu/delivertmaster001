@@ -185,7 +185,7 @@
                     <div class="summary-item"><span>單筆超時(平均)</span><strong style="color:var(--danger);" id="punctuality-avg-timeout">--%</strong></div>
                     <div class="summary-item"><span>總超時率</span><strong style="color:var(--danger);" id="punctuality-total-timeout">--%</strong></div>
                 </div>
-                <!-- 新增：預計補發金額落差區塊 -->
+                
                 <div style="margin-top: 15px; padding: 15px; background: var(--timer-bg); border-radius: 12px; border: 1px solid var(--border); text-align: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
                     <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 5px;">本期預計補發</div>
                     <div id="punctuality-diff-amount" style="font-size: 1.8rem; font-weight: bold; color: var(--success); text-shadow: 0 1px 2px rgba(0,0,0,0.05);">$0.00</div>
@@ -221,7 +221,7 @@
                 <div class="btn-grid" style="margin-top: 10px;">
                     <button class="btn btn-outline" onclick="addUser()">新增使用者</button>
                     <button class="btn btn-outline" onclick="renameUser()">重新命名</button>
-                    <!-- 新增移除使用者功能，佔據兩個網格寬度 -->
+                    <!-- 移除使用者功能，佔據兩個網格寬度 -->
                     <button class="btn btn-outline" onclick="openUserModal('remove')" style="grid-column: span 2; border-color:var(--danger); color:var(--danger);">移除使用者</button>
                 </div>
             </div>
@@ -389,6 +389,7 @@
         <div class="card">
             <h2 id="search-date-range" style="text-align:center; color:var(--primary);">日期範圍</h2>
             <div class="summary-block">
+                <div class="summary-item"><span>總單量</span><strong style="color:var(--primary);" id="search-total-orders">0張</strong></div>
                 <div class="summary-item"><span>總收入</span><strong style="color:var(--success);" id="search-total-income">$0.00</strong></div>
                 <div class="summary-item"><span>總小費</span><strong style="color:var(--success);" id="search-total-tips">$0.00</strong></div>
                 <div class="summary-item"><span>總成本</span><strong style="color:var(--text-main);" id="search-total-costs">-$0.00</strong></div>
@@ -506,7 +507,8 @@
             <h2 style="margin-bottom: 15px; text-align: center;">選擇查詢日期</h2>
             <div class="calendar-wrapper">
                 <div class="calendar-header"><button onclick="calPrevMonth()">◂</button><span id="cal-month-year">讀取中</span><button onclick="calNextMonth()">▸</button></div>
-                <div class="calendar-weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+                <!-- 改為星期一到星期日 -->
+                <div class="calendar-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
                 <div class="calendar-days" id="cal-days"></div>
             </div>
             <div id="cal-selection-text" style="text-align:center; margin-bottom:15px; color:var(--primary); font-weight:bold; min-height: 20px;">請點選開始日期</div>
