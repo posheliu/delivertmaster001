@@ -95,7 +95,7 @@ function injectNewStyles() {
             pointer-events: auto !important;
         }
         body.map-enabled.on-home-view #btn-back {
-            display: none !important; /* 強制隱藏不需要的箭頭 */
+            display: none !important;
         }
         body.map-enabled.on-home-view #header-title-wrapper {
             background: var(--card-bg) !important;
@@ -109,7 +109,7 @@ function injectNewStyles() {
         }
         body.map-enabled.on-home-view #shift-status-badge,
         body.map-enabled.on-home-view #shift-status-badge-right {
-            display: none !important; /* 強制隱藏上線色塊 */
+            display: none !important;
         }
     `;
     document.head.appendChild(style);
@@ -233,17 +233,13 @@ function initMap() {
     if (mapInstance) return;
     
     mapInstance = L.map('map', {zoomControl: false}).setView(currentLoc, 15);
-    // 日夜模式皆用同一個圖層，夜間會藉由 style.css 內的 filter 翻轉顏色，確保道路清楚、水域仍是藍色
     currentTileLayer = L.tileLayer(MAP_TILE, { maxZoom: 19 }).addTo(mapInstance);
     
-    // 初始化假路況圖層
     trafficLayer = L.layerGroup().addTo(mapInstance);
     
-    // 視線擴散的藍色圓點 (改為梯形/鈍角的照射範圍)
     const blueDotIcon = L.divIcon({
         className: 'custom-blue-dot',
         html: `<div id="map-dir-marker" style="width: 18px; height: 18px; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
-                  <!-- 梯形擴散光暈 -->
                   <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 220px; height: 100px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center;"></div>
                </div>`,
         iconSize: [18, 18],
@@ -263,7 +259,7 @@ function initMap() {
                     }
                 }
                 if (!hasCenteredMapInit) {
-                    recenterMap(true); // 第一次定位直接瞬間跳轉，不要動畫
+                    recenterMap(true);
                     hasCenteredMapInit = true;
                 } else if (mapInstance) {
                     const bounds = mapInstance.getBounds();
@@ -275,18 +271,14 @@ function initMap() {
         );
     }
 
-    // 地圖移動後觸發擷取假路況
     mapInstance.on('moveend', () => {
         clearTimeout(window.trafficTimer);
         window.trafficTimer = setTimeout(loadFakeTraffic, 800);
     });
     setTimeout(loadFakeTraffic, 1000);
-    
-    // 確保地圖尺寸完全刷新，避免白畫面/灰畫面問題
     setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 500);
 }
 
-// 動態讀取 OSM 道路產生逼真且美觀的綠/黃/紅路況
 function loadFakeTraffic() {
     if (!document.body.classList.contains('map-enabled') || !mapInstance) return;
     if (mapInstance.getZoom() < 13) {
@@ -302,7 +294,6 @@ function loadFakeTraffic() {
     const w = bounds.getWest() - 0.01;
     const e = bounds.getEast() + 0.01;
     
-    // 向真實地圖庫要主要道路資料
     const query = `[out:json][timeout:5];(way["highway"~"primary|secondary"](${s},${w},${n},${e}););out geom;`;
     
     fetch('https://overpass-api.de/api/interpreter', {
@@ -314,11 +305,10 @@ function loadFakeTraffic() {
             if (el.type === 'way' && el.geometry) {
                 const latlngs = el.geometry.map(g => [g.lat, g.lon]);
                 const rand = Math.random();
-                let color = '#22c55e'; // 綠色路況 (佔多數，美觀舒適)
-                if (rand > 0.8) color = '#eab308'; // 黃色
-                if (rand > 0.95) color = '#ef4444'; // 紅色
+                let color = '#22c55e'; 
+                if (rand > 0.8) color = '#eab308'; 
+                if (rand > 0.95) color = '#ef4444'; 
                 
-                // 背景線 (負責形成邊線顏色)
                 L.polyline(latlngs, {
                     color: color,
                     weight: 6,
@@ -328,7 +318,6 @@ function loadFakeTraffic() {
                     className: 'fake-traffic-line-bg'
                 }).addTo(trafficLayer);
 
-                // 前景線 (負責實體軌道鏤空白線)
                 L.polyline(latlngs, {
                     color: '#ffffff', 
                     weight: 2,
@@ -341,30 +330,25 @@ function loadFakeTraffic() {
         });
         isFetchingTraffic = false;
     }).catch(() => {
-        isFetchingTraffic = false; // 失敗則默默忽略
+        isFetchingTraffic = false;
     });
 }
 
-// 支援瞬間跳轉或快速平滑移動
 function recenterMap(instant = false) {
     if (mapInstance && currentLoc) {
         const zoom = mapInstance.getZoom() || 15;
         const targetPoint = mapInstance.project(currentLoc, zoom);
-        // 將中心點往下偏移1/4螢幕高度，這樣定位藍點就會跑在畫面「上半部」而不被下方拖曳區蓋住
         targetPoint.y += (window.innerHeight / 4); 
         const targetLatLng = mapInstance.unproject(targetPoint, zoom);
         
         if (instant) {
-            // 瞬間切換位置 (用於首次 GPS 定位)
             mapInstance.setView(targetLatLng, zoom, { animate: false });
         } else {
-            // 快速直線平移，取代原本緩慢的拋物線 flyTo
             mapInstance.setView(targetLatLng, zoom, { animate: true, duration: 0.25 });
         }
     }
 }
 
-// 供外部呼叫更新 Header 透明度的函式
 window.updatePanelOpacity = function() {
     if (currentViewIndex !== 0 || !document.body.classList.contains('map-enabled')) return;
     const panel = document.getElementById('bottom-panel');
@@ -372,7 +356,6 @@ window.updatePanelOpacity = function() {
     const match = panel.style.transform.match(/translateY\(([-\d.]+)px\)/);
     const y = match ? parseFloat(match[1]) : window.innerHeight * 0.5;
     
-    // 當面板往上推近 80px 時，按鈕開始淡出
     let opacity = Math.max(0, Math.min(1, y / 80));
     
     const els = [
@@ -400,9 +383,9 @@ function initBottomPanel() {
     function updatePanelDimensions() {
         let viewH = window.innerHeight;
         snapPoints = [
-            0,              // 最高：完全展開到最頂部 (Top 0)
+            0,              // 最高 (Top 0)
             viewH * 0.5,    // 中間
-            viewH - 160     // 最低：稍微拉高，確保「提示那排字」能完全露出
+            viewH - 160     // 最低
         ];
     }
 
@@ -411,7 +394,6 @@ function initBottomPanel() {
         return match ? parseFloat(match[1]) : snapPoints[1];
     }
 
-    // 觸發拖曳把手
     header.addEventListener('touchstart', (e) => {
         if (!document.body.classList.contains('map-enabled')) return;
         isDraggingPanel = true; hasMoved = false;
@@ -421,7 +403,6 @@ function initBottomPanel() {
         panel.classList.add('dragging');
     }, {passive: true});
 
-    // 觸碰內容區時記錄起始點
     content.addEventListener('touchstart', (e) => {
         if (!document.body.classList.contains('map-enabled')) return;
         contentStartY = e.touches[0].clientY;
@@ -430,12 +411,10 @@ function initBottomPanel() {
         isContentDragging = false;
     }, {passive: true});
 
-    // 統一處理拖曳邏輯
     document.addEventListener('touchmove', (e) => {
-        if (!document.body.classList.contains('map-enabled')) return;
+        if (!isDraggingPanel || !document.body.classList.contains('map-enabled')) return;
         const currentY = e.touches[0].clientY;
 
-        // 如果按住的是把手，純粹拖曳面板
         if (isDraggingPanel) {
             const deltaY = currentY - startY;
             if (Math.abs(deltaY) > 5) hasMoved = true;
@@ -446,31 +425,27 @@ function initBottomPanel() {
             panel.style.transform = `translateY(${newY}px)`;
             window.updatePanelOpacity();
         } 
-        // 如果在內容區塊內滾動
         else if (e.target.closest('#panel-scroll-content')) {
             const deltaY = currentY - contentStartY;
-            const isScrollingUp = deltaY > 0; // 手指往下滑動 (內容往上)
-            const isScrollingDown = deltaY < 0; // 手指往上滑動 (內容往下)
+            const isScrollingUp = deltaY > 0; 
+            const isScrollingDown = deltaY < 0; 
             
             let shouldDrag = false;
             
-            // 條件 1：面板不在最頂端，且使用者試圖將內容往上滑（手指上滑） -> 應該先把面板拉上來
             if (isScrollingDown && initialTranslateY > snapPoints[0] + 5) {
                 shouldDrag = true;
             }
-            // 條件 2：內容已經滾到最上面了，且使用者試圖將內容往下壓（手指向下） -> 應該把面板推下去
             else if (isScrollingUp && content.scrollTop <= 0) {
                 shouldDrag = true;
             }
             
             if (shouldDrag) {
-                if (e.cancelable) e.preventDefault(); // 停止原生的滾動行為
+                if (e.cancelable) e.preventDefault(); 
                 
-                // 初次觸發拖曳模式時，重置拖曳基準點，避免跳躍
                 if (!isContentDragging) {
                     isContentDragging = true;
                     hasMoved = false;
-                    startY = currentY; // 以當前位置作為新基準
+                    startY = currentY; 
                     initialTranslateY = getTranslateY();
                     panel.classList.add('dragging');
                 }
@@ -484,7 +459,6 @@ function initBottomPanel() {
                 panel.style.transform = `translateY(${newY}px)`;
                 window.updatePanelOpacity();
             } else if (isContentDragging) {
-                // 如果曾經在拖曳，但條件突然不成立（例如反向滑動），維持阻止預設行為以防畫面抖動
                 if (e.cancelable) e.preventDefault();
             }
         }
@@ -568,7 +542,6 @@ function applySettings() {
         document.body.style.setProperty('--card-bg', `rgba(${cardRgb.r}, ${cardRgb.g}, ${cardRgb.b}, ${op})`, 'important'); document.body.style.setProperty('--timer-bg', `rgba(${cardRgb.r}, ${cardRgb.g}, ${cardRgb.b}, ${opTimer})`, 'important');
     }
     
-    // 依據是否開啟地圖，切換打卡區塊顯示位置
     if (settings.enableMap !== false) {
         document.body.classList.add('map-enabled');
         const sideShift = document.getElementById('side-menu-shift-section');
@@ -866,13 +839,11 @@ function updateUIState() {
     const shiftBadge = document.getElementById('shift-status-badge');
     const shiftBadgeRight = document.getElementById('shift-status-badge-right');
 
-    // 清除行內透明度設定，以免切換頁面時按鈕被卡在透明狀態
     if (btnMenu) { btnMenu.style.opacity = ''; btnMenu.style.pointerEvents = ''; }
     if (titleWrapper) { titleWrapper.style.opacity = ''; titleWrapper.style.pointerEvents = ''; }
     if (btnRecenter) { btnRecenter.style.opacity = ''; btnRecenter.style.pointerEvents = ''; }
 
     if (isSearchResultOpen || document.getElementById('view-daily-detail').classList.contains('active')) { 
-        // 進入細節畫面時，移除透明化效果
         document.body.classList.remove('on-home-view');
         btnSearch.style.display = 'none'; btnBack.style.display = 'block'; 
         if(btnMenu) btnMenu.style.display = 'none';
@@ -888,12 +859,10 @@ function updateUIState() {
             titleWrapper.onclick = () => openUserModal('switch');
             if (activeShift) updateShiftUI();
             
-            // 重新評估首頁的動態透明度
             if (typeof window.updatePanelOpacity === 'function') {
                 window.updatePanelOpacity();
             }
         } else {
-            // 切換至其他大分頁時，移除透明化效果
             document.body.classList.remove('on-home-view');
             title.innerHTML = viewTitles[currentViewIndex]; 
             titleWrapper.style.pointerEvents = 'none'; titleWrapper.style.cursor = 'default'; titleWrapper.onclick = null;
@@ -987,11 +956,9 @@ function updateShiftUI() {
         
         if (currentViewIndex === 0) {
             if (isMapEnabled) {
-                // 滿版地圖模式下，強制隱藏所有上線色塊 (維持畫面乾淨)
                 badgeCenter.style.display = 'none';
                 if (badgeRight) badgeRight.style.display = 'none';
             } else {
-                // 無滿版地圖：放右上角
                 badgeCenter.style.display = 'none';
                 if (badgeRight) badgeRight.style.display = 'inline-block';
             }
@@ -1030,8 +997,11 @@ async function stopTimer(id) {
     const index = activeTimers.findIndex(t => t.id === id); if (index === -1) return; 
     const timer = activeTimers[index], endTime = Date.now(), diffMins = Math.max(1, Math.round((endTime - timer.startTime) / 60000)); 
     const billableMins = Math.max(diffMins, timer.estimatedTime || 0);
-    let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100) / 100;
+    
+    // 加入 +0.0001 補償機制，精準符合小數點第二位無條件進位
+    let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
     if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+    
     const endDateObj = new Date(endTime); 
     historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
     activeTimers.splice(index, 1); 
@@ -1080,8 +1050,28 @@ function selectStore(storeName) {
 
 /* ================== 預估時間與刪除紀錄邏輯 ================== */
 async function setEstimatedTime(id) { closeAllSwipes(); const timer = activeTimers.find(t => t.id === id); if (!timer) return; const val = await appPrompt('請輸入預估時間 (分鐘):', timer.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { timer.estimatedTime = num; localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
-async function editHistoryEstimatedTime(id) { closeAllSwipes(); const record = historyRecords.find(r => r.id === id); if (!record) return; const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { record.estimatedTime = num; const billableMins = Math.max(record.durationMins, num); let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100) / 100;
- if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; record.amount = Number(amount); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
+async function editHistoryEstimatedTime(id) { 
+    closeAllSwipes(); 
+    const record = historyRecords.find(r => r.id === id); 
+    if (!record) return; 
+    const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); 
+    if (val !== null && val.trim() !== '') { 
+        const num = parseInt(val, 10); 
+        if (!isNaN(num) && num >= 0) { 
+            record.estimatedTime = num; 
+            const billableMins = Math.max(record.durationMins, num); 
+            let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
+            if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+            record.amount = Number(amount.toFixed(2)); 
+            localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
+            renderWeeklyData(); 
+            if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); 
+            if (currentViewIndex === 4) calculatePunctuality(); 
+        } else { 
+            await appAlert('請輸入有效的數字', '錯誤'); 
+        } 
+    } 
+}
 async function deleteHistoryRecord(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆收入紀錄嗎？', '刪除確認', true)) { historyRecords = historyRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } }
 
 /* ================== 卡片拖曳排序邏輯 ================== */
@@ -1312,8 +1302,6 @@ function openFilterModal() { calSelStart = null; calSelEnd = null; renderCalenda
 function renderCalendar() { 
     const y = currentCalDate.getFullYear(), m = currentCalDate.getMonth(); 
     document.getElementById('cal-month-year').innerText = `${y}年${m + 1}月`; 
-    // getDay() 回傳: 0=日, 1=一, 2=二...
-    // 為了讓日曆從星期一開始，我們需要將「星期日」移到最後 (索引6)，其餘往前推
     const firstDay = new Date(y, m, 1).getDay(); 
     let emptyDays = firstDay === 0 ? 6 : firstDay - 1; 
 
@@ -1339,7 +1327,7 @@ async function applyFilter() {
     const sTime = calSelStart, eTime = (calSelEnd || calSelStart) + 86399999; 
     const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
     
-    document.getElementById('search-total-orders').innerText = fInc.length + '張'; // 新增總單量顯示
+    document.getElementById('search-total-orders').innerText = fInc.length + '張'; 
     document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); 
     document.getElementById('search-total-tips').innerText = fmtMoney(fTip.reduce((s, r)=>s+r.amount,0)); 
     document.getElementById('search-total-costs').innerText = '-' + fmtMoney(fCost.reduce((s, r)=>s+r.amount,0)); 
@@ -1395,7 +1383,7 @@ function calculatePunctuality() {
     }
 
     let onTimeCount = 0, singleTimeoutRates = [], totalActual = 0, totalEstimatedWithBuffer = 0;
-    let totalActualAmount = 0, totalEstimatedAmount = 0; // 新增金額變數
+    let totalActualAmount = 0, totalEstimatedAmount = 0;
 
     validRecords.forEach(r => {
         let limit = r.estimatedTime + buffer;
@@ -1403,9 +1391,8 @@ function calculatePunctuality() {
         if (actual <= limit) { onTimeCount++; singleTimeoutRates.push(0); } else { singleTimeoutRates.push((actual - limit) / limit); }
         totalActual += actual; totalEstimatedWithBuffer += limit;
         
-        // 計算實際金額與預估金額
         totalActualAmount += r.amount;
-        let estAmt = Math.ceil(((r.estimatedTime / 60) * RATE_PER_HOUR) * 100) / 100;
+        let estAmt = Math.ceil(((r.estimatedTime / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
         if (estAmt < MIN_AMOUNT) estAmt = MIN_AMOUNT;
         totalEstimatedAmount += Number(estAmt);
     });
@@ -1421,7 +1408,7 @@ function calculatePunctuality() {
     document.getElementById('punctuality-ontime').innerText = onTimeRate.toFixed(1) + '%';
     document.getElementById('punctuality-avg-timeout').innerText = avgTimeoutRate.toFixed(1) + '%';
     document.getElementById('punctuality-total-timeout').innerText = totalTimeoutRate.toFixed(1) + '%';
-    document.getElementById('punctuality-diff-amount').innerText = fmtMoney(diffAmount); // 顯示補發金額
+    document.getElementById('punctuality-diff-amount').innerText = fmtMoney(diffAmount);
 }
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
