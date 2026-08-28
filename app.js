@@ -402,7 +402,7 @@ function initBottomPanel() {
         snapPoints = [
             0,              // 最高：完全展開到最頂部 (Top 0)
             viewH * 0.5,    // 中間
-            viewH - 160     // 最低：確保「提示那排字」能完全露出
+            viewH - 160     // 最低：稍微拉高，確保「提示那排字」能完全露出
         ];
     }
 
@@ -1030,10 +1030,10 @@ async function stopTimer(id) {
     const index = activeTimers.findIndex(t => t.id === id); if (index === -1) return; 
     const timer = activeTimers[index], endTime = Date.now(), diffMins = Math.max(1, Math.round((endTime - timer.startTime) / 60000)); 
     const billableMins = Math.max(diffMins, timer.estimatedTime || 0);
-    let amount = Math.ceil((billableMins / 60) * RATE_PER_HOUR); // 改為無條件進位
+    let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100) / 100;
     if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
     const endDateObj = new Date(endTime); 
-    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
+    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
     activeTimers.splice(index, 1); 
     localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); 
     localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
@@ -1080,7 +1080,7 @@ function selectStore(storeName) {
 
 /* ================== 預估時間與刪除紀錄邏輯 ================== */
 async function setEstimatedTime(id) { closeAllSwipes(); const timer = activeTimers.find(t => t.id === id); if (!timer) return; const val = await appPrompt('請輸入預估時間 (分鐘):', timer.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { timer.estimatedTime = num; localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
-async function editHistoryEstimatedTime(id) { closeAllSwipes(); const record = historyRecords.find(r => r.id === id); if (!record) return; const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { record.estimatedTime = num; const billableMins = Math.max(record.durationMins, num); let amount = Math.ceil((billableMins / 60) * RATE_PER_HOUR); // 改為無條件進位
+async function editHistoryEstimatedTime(id) { closeAllSwipes(); const record = historyRecords.find(r => r.id === id); if (!record) return; const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { record.estimatedTime = num; const billableMins = Math.max(record.durationMins, num); let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100) / 100;
  if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; record.amount = Number(amount); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
 async function deleteHistoryRecord(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆收入紀錄嗎？', '刪除確認', true)) { historyRecords = historyRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } }
 
@@ -1405,7 +1405,7 @@ function calculatePunctuality() {
         
         // 計算實際金額與預估金額
         totalActualAmount += r.amount;
-        let estAmt = Math.ceil((r.estimatedTime / 60) * RATE_PER_HOUR); // 同步採用無條件進位
+        let estAmt = Math.ceil(((r.estimatedTime / 60) * RATE_PER_HOUR) * 100) / 100;
         if (estAmt < MIN_AMOUNT) estAmt = MIN_AMOUNT;
         totalEstimatedAmount += Number(estAmt);
     });
