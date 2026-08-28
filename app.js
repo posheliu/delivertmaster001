@@ -58,6 +58,13 @@ function injectNewStyles() {
         /* ===== 啟用滿版地圖時，隱藏底部導航列 ===== */
         body.map-enabled .bottom-nav { display: none !important; }
 
+        /* ===== 滿版地圖面板最高點：覆蓋整個畫面 (高度100vh) ===== */
+        body.map-enabled .bottom-panel {
+            top: 0 !important;
+            height: 100vh !important;
+            z-index: 90 !important; /* Header is 100 */
+        }
+
         /* ===== 左側選單 (狀態列) 樣式 ===== */
         .side-menu-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 2999; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
         .side-menu-overlay.active { opacity: 1; visibility: visible; }
@@ -93,9 +100,10 @@ function injectNewStyles() {
             align-items: center !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
             pointer-events: auto !important;
+            transition: opacity 0.2s;
         }
         body.map-enabled.on-home-view #btn-back {
-            display: none !important; /* 強制隱藏不需要的箭頭 */
+            display: none !important;
         }
         body.map-enabled.on-home-view #header-title-wrapper {
             background: var(--card-bg) !important;
@@ -103,13 +111,14 @@ function injectNewStyles() {
             border-radius: 20px !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
             pointer-events: auto !important;
+            transition: opacity 0.2s;
         }
         body.map-enabled.on-home-view #btn-search {
             pointer-events: auto !important;
         }
         body.map-enabled.on-home-view #shift-status-badge,
         body.map-enabled.on-home-view #shift-status-badge-right {
-            display: none !important; /* 強制隱藏上線色塊 */
+            display: none !important;
         }
     `;
     document.head.appendChild(style);
@@ -233,17 +242,13 @@ function initMap() {
     if (mapInstance) return;
     
     mapInstance = L.map('map', {zoomControl: false}).setView(currentLoc, 15);
-    // 日夜模式皆用同一個圖層，夜間會藉由 style.css 內的 filter 翻轉顏色，確保道路清楚、水域仍是藍色
     currentTileLayer = L.tileLayer(MAP_TILE, { maxZoom: 19 }).addTo(mapInstance);
     
-    // 初始化假路況圖層
     trafficLayer = L.layerGroup().addTo(mapInstance);
     
-    // 視線擴散的藍色圓點 (改為梯形/鈍角的照射範圍)
     const blueDotIcon = L.divIcon({
         className: 'custom-blue-dot',
         html: `<div id="map-dir-marker" style="width: 18px; height: 18px; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
-                  <!-- 梯形擴散光暈 -->
                   <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 220px; height: 100px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center;"></div>
                </div>`,
         iconSize: [18, 18],
@@ -263,7 +268,7 @@ function initMap() {
                     }
                 }
                 if (!hasCenteredMapInit) {
-                    recenterMap(true); // 第一次定位直接瞬間跳轉，不要動畫
+                    recenterMap(true); 
                     hasCenteredMapInit = true;
                 } else if (mapInstance) {
                     const bounds = mapInstance.getBounds();
@@ -275,18 +280,14 @@ function initMap() {
         );
     }
 
-    // 地圖移動後觸發擷取假路況
     mapInstance.on('moveend', () => {
         clearTimeout(window.trafficTimer);
         window.trafficTimer = setTimeout(loadFakeTraffic, 800);
     });
     setTimeout(loadFakeTraffic, 1000);
-    
-    // 確保地圖尺寸完全刷新，避免白畫面/灰畫面問題
     setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 500);
 }
 
-// 動態讀取 OSM 道路產生逼真且美觀的綠/黃/紅路況
 function loadFakeTraffic() {
     if (!document.body.classList.contains('map-enabled') || !mapInstance) return;
     if (mapInstance.getZoom() < 13) {
@@ -302,7 +303,6 @@ function loadFakeTraffic() {
     const w = bounds.getWest() - 0.01;
     const e = bounds.getEast() + 0.01;
     
-    // 向真實地圖庫要主要道路資料
     const query = `[out:json][timeout:5];(way["highway"~"primary|secondary"](${s},${w},${n},${e}););out geom;`;
     
     fetch('https://overpass-api.de/api/interpreter', {
@@ -314,11 +314,10 @@ function loadFakeTraffic() {
             if (el.type === 'way' && el.geometry) {
                 const latlngs = el.geometry.map(g => [g.lat, g.lon]);
                 const rand = Math.random();
-                let color = '#22c55e'; // 綠色路況 (佔多數，美觀舒適)
-                if (rand > 0.8) color = '#eab308'; // 黃色
-                if (rand > 0.95) color = '#ef4444'; // 紅色
+                let color = '#22c55e'; 
+                if (rand > 0.8) color = '#eab308'; 
+                if (rand > 0.95) color = '#ef4444'; 
                 
-                // 背景線 (負責形成邊線顏色)
                 L.polyline(latlngs, {
                     color: color,
                     weight: 6,
@@ -328,7 +327,6 @@ function loadFakeTraffic() {
                     className: 'fake-traffic-line-bg'
                 }).addTo(trafficLayer);
 
-                // 前景線 (負責實體軌道鏤空白線)
                 L.polyline(latlngs, {
                     color: '#ffffff', 
                     weight: 2,
@@ -341,30 +339,26 @@ function loadFakeTraffic() {
         });
         isFetchingTraffic = false;
     }).catch(() => {
-        isFetchingTraffic = false; // 失敗則默默忽略
+        isFetchingTraffic = false; 
     });
 }
 
-// 支援瞬間跳轉或快速平滑移動
 function recenterMap(instant = false) {
     if (mapInstance && currentLoc) {
         const zoom = mapInstance.getZoom() || 15;
         const targetPoint = mapInstance.project(currentLoc, zoom);
-        // 將中心點往下偏移1/4螢幕高度，這樣定位藍點就會跑在畫面「上半部」而不被下方拖曳區蓋住
         targetPoint.y += (window.innerHeight / 4); 
         const targetLatLng = mapInstance.unproject(targetPoint, zoom);
         
         if (instant) {
-            // 瞬間切換位置 (用於首次 GPS 定位)
             mapInstance.setView(targetLatLng, zoom, { animate: false });
         } else {
-            // 快速直線平移，取代原本緩慢的拋物線 flyTo
             mapInstance.setView(targetLatLng, zoom, { animate: true, duration: 0.25 });
         }
     }
 }
 
-// 供外部呼叫更新 Header 透明度的函式
+// 根據面板高度動態調整 Header 按鈕透明度
 window.updatePanelOpacity = function() {
     if (currentViewIndex !== 0 || !document.body.classList.contains('map-enabled')) return;
     const panel = document.getElementById('bottom-panel');
@@ -372,8 +366,8 @@ window.updatePanelOpacity = function() {
     const match = panel.style.transform.match(/translateY\(([-\d.]+)px\)/);
     const y = match ? parseFloat(match[1]) : window.innerHeight * 0.5;
     
-    // 當面板往上推近 80px 時，按鈕開始淡出
-    let opacity = Math.max(0, Math.min(1, y / 80));
+    // 面板距離頂端 <= 120px 時開始淡出 (因為按鈕高度約在 60-70px 左右)
+    let opacity = Math.max(0, Math.min(1, y / 120));
     
     const els = [
         document.getElementById('btn-menu'),
@@ -384,7 +378,7 @@ window.updatePanelOpacity = function() {
     els.forEach(el => {
         if (el) {
             el.style.opacity = opacity;
-            el.style.pointerEvents = opacity < 0.5 ? 'none' : 'auto';
+            el.style.pointerEvents = opacity < 0.3 ? 'none' : 'auto';
         }
     });
 };
@@ -395,14 +389,14 @@ function initBottomPanel() {
     const content = document.getElementById('panel-scroll-content');
     if (!panel || !header || !content) return;
 
-    let isDraggingPanel = false, isContentDragging = false, startY = 0, startX = 0, initialTranslateY = 0, snapPoints = [], hasMoved = false, isHorizontalSwipe = false;
+    let isDraggingPanel = false, isContentDragging = false, startY = 0, contentStartY = 0, initialTranslateY = 0, snapPoints = [], hasMoved = false;
 
     function updatePanelDimensions() {
         let viewH = window.innerHeight;
         snapPoints = [
-            0,              // 最高：完全展開到最頂部 (Top 0)
-            viewH * 0.5,    // 中間
-            viewH - 160     // 最低：確保「提示那排字」能完全露出
+            0,                  // 最高：完全展開到最頂部 (Top 0)
+            (viewH * 0.5) + 30, // 中間：預設停留在中間微下方
+            viewH - 160         // 最低：確保「提示那排字」能完全露出
         ];
     }
 
@@ -411,36 +405,28 @@ function initBottomPanel() {
         return match ? parseFloat(match[1]) : snapPoints[1];
     }
 
-    // 觸發拖曳把手
     header.addEventListener('touchstart', (e) => {
         if (!document.body.classList.contains('map-enabled')) return;
-        isDraggingPanel = true; hasMoved = false; isHorizontalSwipe = false;
+        isDraggingPanel = true; hasMoved = false;
         updatePanelDimensions(); 
         startY = e.touches[0].clientY;
-        startX = e.touches[0].clientX;
         initialTranslateY = getTranslateY();
         panel.classList.add('dragging');
     }, {passive: true});
 
-    // 觸碰內容區時記錄起始點
     content.addEventListener('touchstart', (e) => {
         if (!document.body.classList.contains('map-enabled')) return;
-        startY = e.touches[0].clientY;
-        startX = e.touches[0].clientX;
+        contentStartY = e.touches[0].clientY;
         updatePanelDimensions();
         initialTranslateY = getTranslateY();
         isContentDragging = false;
-        hasMoved = false;
-        isHorizontalSwipe = false;
     }, {passive: true});
 
-    // 統一處理拖曳邏輯
+    // 處理面板拖曳與內容無縫滾動邏輯
     document.addEventListener('touchmove', (e) => {
         if (!document.body.classList.contains('map-enabled')) return;
         const currentY = e.touches[0].clientY;
-        const currentX = e.touches[0].clientX;
 
-        // 如果按住的是把手，純粹拖曳面板
         if (isDraggingPanel) {
             const deltaY = currentY - startY;
             if (Math.abs(deltaY) > 5) hasMoved = true;
@@ -451,41 +437,48 @@ function initBottomPanel() {
             panel.style.transform = `translateY(${newY}px)`;
             window.updatePanelOpacity();
         } 
-        // 如果在內容區塊內滾動
         else if (e.target.closest('#panel-scroll-content')) {
-            const deltaY = currentY - startY;
-            const deltaX = currentX - startX;
-
-            // 防干擾機制：如果還沒有判定方向，且移動距離超過 5px
-            if (!isContentDragging && !isHorizontalSwipe) {
-                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 5) {
-                    isHorizontalSwipe = true; // 判定為橫向滑動 (卡片刪除)
-                }
+            const deltaY = currentY - contentStartY;
+            const isSwipingDown = deltaY > 0; // 手指往下滑動 (想看上方內容)
+            const isSwipingUp = deltaY < 0;   // 手指往上滑動 (想看下方內容)
+            
+            // 判定滾動邊界，加入 2px 浮點數誤差容忍
+            const isAtTop = content.scrollTop <= 0;
+            const isAtBottom = Math.ceil(content.scrollTop + content.clientHeight) >= content.scrollHeight - 2;
+            
+            let shouldDrag = false;
+            
+            // 如果手指往下滑且內容已在最頂端，則將面板拉下
+            if (isSwipingDown && isAtTop) {
+                shouldDrag = true;
+            } 
+            // 如果手指往上滑且內容已在最底端 (或是內容長度不足以捲動)，則將面板推上
+            else if (isSwipingUp && isAtBottom) {
+                shouldDrag = true;
             }
-
-            if (isHorizontalSwipe) return; // 交給 swipe-to-delete 自己處理
-
-            if (isContentDragging) {
-                if (Math.abs(deltaY) > 5) hasMoved = true;
-                if (e.cancelable) e.preventDefault();
-                let newY = initialTranslateY + deltaY;
-                if (newY < snapPoints[0]) newY = snapPoints[0] - (snapPoints[0] - newY) * 0.2;
+            
+            if (shouldDrag) {
+                if (e.cancelable) e.preventDefault(); 
+                
+                // 初次觸發拖曳時，轉換為拖曳模式並重置基準點
+                if (!isContentDragging) {
+                    isContentDragging = true;
+                    hasMoved = false;
+                    startY = currentY; 
+                    initialTranslateY = getTranslateY();
+                    panel.classList.add('dragging');
+                }
+                
+                const dragDelta = currentY - startY;
+                if (Math.abs(dragDelta) > 5) hasMoved = true;
+                
+                let newY = initialTranslateY + dragDelta;
+                if (newY < snapPoints[0]) newY = snapPoints[0] - (snapPoints[0] - newY) * 0.2; 
                 if (newY > snapPoints[2]) newY = snapPoints[2] + (newY - snapPoints[2]) * 0.2;
                 panel.style.transform = `translateY(${newY}px)`;
                 window.updatePanelOpacity();
-            } else {
-                if (initialTranslateY > snapPoints[0] + 5) {
-                    // 如果面板沒展開，一律接管拖曳 (往上拉)
-                    isContentDragging = true;
-                    panel.classList.add('dragging');
-                    if (e.cancelable) e.preventDefault();
-                } else if (content.scrollTop <= 0 && deltaY > 0) {
-                    // 如果已經展開，但在頂部往下滑，接管拖曳 (往下拉)
-                    isContentDragging = true;
-                    panel.classList.add('dragging');
-                    if (e.cancelable) e.preventDefault();
-                }
-                // 否則讓瀏覽器原生捲動
+            } else if (isContentDragging) {
+                if (e.cancelable) e.preventDefault();
             }
         }
     }, {passive: false});
@@ -554,7 +547,7 @@ function applySettings() {
 
     if (settings.colorTheme === 'custom') {
         document.body.setAttribute('data-color-theme', 'custom');
-        const pColor = settings.customPrimary || '#ff7597', rgb = hexToRgb(pColor), lum = getLuminance(rgb.r, rgb.g, lum = getLuminance(rgb.r, rgb.g, rgb.b), btnText = lum > 0.6 ? '#000000' : '#ffffff', autoBg = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.05)`);
+        const pColor = settings.customPrimary || '#ff7597', rgb = hexToRgb(pColor), lum = getLuminance(rgb.r, rgb.g, rgb.b), btnText = lum > 0.6 ? '#000000' : '#ffffff', autoBg = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.05)`;
         document.documentElement.style.setProperty('--primary', pColor); document.documentElement.style.setProperty('--primary-hover', pColor); document.documentElement.style.setProperty('--btn-text', btnText); document.documentElement.style.setProperty('--page-bg', autoBg); document.documentElement.style.setProperty('--bg', autoBg); document.documentElement.style.setProperty('--border', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`); document.documentElement.style.setProperty('--card-bg', '#ffffff'); document.documentElement.style.setProperty('--timer-bg', '#f8fafc'); document.documentElement.style.setProperty('--danger', `rgba(${Math.max(0, rgb.r-60)}, ${Math.max(0, rgb.g-60)}, ${Math.max(0, rgb.b-60)}, 1)`);
         document.getElementById('custom-theme-panel').style.display = 'block'; document.getElementById('picker-primary').value = pColor;
     } else { document.body.setAttribute('data-color-theme', settings.colorTheme); document.getElementById('custom-theme-panel').style.display = 'none'; }
@@ -568,7 +561,6 @@ function applySettings() {
         document.body.style.setProperty('--card-bg', `rgba(${cardRgb.r}, ${cardRgb.g}, ${cardRgb.b}, ${op})`, 'important'); document.body.style.setProperty('--timer-bg', `rgba(${cardRgb.r}, ${cardRgb.g}, ${cardRgb.b}, ${opTimer})`, 'important');
     }
     
-    // 依據是否開啟地圖，切換打卡區塊顯示位置
     if (settings.enableMap !== false) {
         document.body.classList.add('map-enabled');
         const sideShift = document.getElementById('side-menu-shift-section');
