@@ -111,7 +111,7 @@
                 <div class="collapsible-wrap">
                     <div class="collapsible-content">
                         <div style="margin-top: 15px;">
-                            <div class="input-group"><label>金額</label><input type="number" id="tip-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+                            <div class="input-group"><label>金額</label><input type="number" inputmode="numeric" id="tip-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                             <div class="input-group"><label>支付方式</label><select id="tip-method" class="form-control"><option value="現金">現金</option><option value="刷卡">刷卡</option></select></div>
                             <button class="btn" onclick="saveTip()">記錄小費</button>
                         </div>
@@ -149,9 +149,9 @@
                 <div class="collapsible-wrap">
                     <div class="collapsible-content">
                         <div style="margin-top: 15px;">
-                            <div class="input-group"><label>金額</label><input type="number" id="cost-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+                            <div class="input-group"><label>金額</label><input type="number" inputmode="numeric" id="cost-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                             <div class="input-group"><label>類別</label><select id="cost-type" class="form-control" onchange="toggleMileageInput()"><option value="加油">加油</option><option value="保養維修">保養維修</option><option value="周邊設備">周邊設備</option></select></div>
-                            <div class="input-group" id="mileage-group"><label>里程數 (選填)</label><input type="number" id="cost-mileage" class="form-control" placeholder="輸入當前里程數" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+                            <div class="input-group" id="mileage-group"><label>里程數 (選填)</label><input type="number" inputmode="numeric" id="cost-mileage" class="form-control" placeholder="輸入當前里程數" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                             <div class="input-group"><label>備註 (選填)</label><input type="text" id="cost-memo" class="form-control" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
                             <button class="btn" onclick="saveCost()">記錄成本</button>
                         </div>
@@ -174,20 +174,38 @@
                 </h2>
                 <div class="input-group">
                     <label>合理彈性時間 (分鐘)</label>
-                    <input type="number" id="rate-buffer-time" class="form-control" value="5" oninput="calculatePunctuality()" autocomplete="off" autocorrect="off" spellcheck="false">
+                    <input type="number" inputmode="numeric" id="rate-buffer-time" class="form-control" value="5" oninput="calculatePunctuality()" autocomplete="off" autocorrect="off" spellcheck="false">
                 </div>
+                
+                <!-- 本期資料 -->
                 <div class="summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
                     <div class="summary-item"><span>準時率</span><strong style="color:var(--success);" id="punctuality-ontime">--%</strong></div>
                     <div class="summary-item"><span>單筆超時(平均)</span><strong style="color:var(--danger);" id="punctuality-avg-timeout">--%</strong></div>
                     <div class="summary-item"><span>總超時率</span><strong style="color:var(--danger);" id="punctuality-total-timeout">--%</strong></div>
                 </div>
-                
                 <div style="margin-top: 15px; padding: 15px; background: var(--timer-bg); border-radius: 12px; border: 1px solid var(--border); text-align: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
                     <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 5px;">本期預計補發</div>
                     <div id="punctuality-diff-amount" style="font-size: 1.8rem; font-weight: bold; color: var(--success); text-shadow: 0 1px 2px rgba(0,0,0,0.05);">$0.00</div>
                 </div>
 
-                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 15px; line-height: 1.4;">
+                <!-- 前一期資料 -->
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px dashed var(--border);">
+                    <h3 style="font-size: 1rem; color: var(--text-main); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+                        <span>前一期資料</span>
+                        <span id="prev-punctuality-cycle-info" style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">讀取中...</span>
+                    </h3>
+                    <div class="summary-block" style="margin-top: 0; padding-top: 0; border-top: none;">
+                        <div class="summary-item"><span>準時率</span><strong style="color:var(--success); font-size:1.1rem;" id="prev-punctuality-ontime">--%</strong></div>
+                        <div class="summary-item"><span>單筆超時</span><strong style="color:var(--danger); font-size:1.1rem;" id="prev-punctuality-avg-timeout">--%</strong></div>
+                        <div class="summary-item"><span>總超時率</span><strong style="color:var(--danger); font-size:1.1rem;" id="prev-punctuality-total-timeout">--%</strong></div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: var(--page-bg); border-radius: 8px; border: 1px solid rgba(0,0,0,0.05); text-align: center;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 2px;">前期預計補發</div>
+                        <div id="prev-punctuality-diff-amount" style="font-size: 1.3rem; font-weight: bold; color: var(--success);">$0.00</div>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 20px; line-height: 1.4;">
                     * 僅計算已寫入「預估時間」之訂單。週期為每兩週結算一次。<br><br>
                     <span style="color: var(--primary); font-weight: bold;">* 本系統內所有數據內容僅供參考，實際數據以官方公布為主。</span>
                 </p>
@@ -217,6 +235,7 @@
                 <div class="btn-grid" style="margin-top: 10px;">
                     <button class="btn btn-outline" onclick="addUser()">新增使用者</button>
                     <button class="btn btn-outline" onclick="renameUser()">重新命名</button>
+                    <!-- 移除使用者功能，佔據兩個網格寬度 -->
                     <button class="btn btn-outline" onclick="openUserModal('remove')" style="grid-column: span 2; border-color:var(--danger); color:var(--danger);">移除使用者</button>
                 </div>
             </div>
@@ -349,12 +368,12 @@
 
     <!-- 底部導航 (未啟用滿版地圖時顯示) -->
     <div class="bottom-nav">
-        <a class="nav-item active" id="nav-0" onclick="switchView(0, true)"><span class="nav-icon">☗</span><span>首頁</span></a>
-        <a class="nav-item" id="nav-1" onclick="switchView(1, true)"><span class="nav-icon">＄</span><span>收入</span></a>
-        <a class="nav-item" id="nav-2" onclick="switchView(2, true)"><span class="nav-icon">♥&#xFE0E;</span><span>小費</span></a>
-        <a class="nav-item" id="nav-3" onclick="switchView(3, true)"><span class="nav-icon">☈</span><span>成本</span></a>
-        <a class="nav-item" id="nav-4" onclick="switchView(4, true)"><span class="nav-icon">◕</span><span>準時率</span></a>
-        <a class="nav-item" id="nav-5" onclick="switchView(5, true)"><span class="nav-icon">⛯</span><span>設定</span></a>
+        <a class="nav-item active" id="nav-0" onclick="switchView(0)"><span class="nav-icon">☗</span><span>首頁</span></a>
+        <a class="nav-item" id="nav-1" onclick="switchView(1)"><span class="nav-icon">＄</span><span>收入</span></a>
+        <a class="nav-item" id="nav-2" onclick="switchView(2)"><span class="nav-icon">♥&#xFE0E;</span><span>小費</span></a>
+        <a class="nav-item" id="nav-3" onclick="switchView(3)"><span class="nav-icon">☈</span><span>成本</span></a>
+        <a class="nav-item" id="nav-4" onclick="switchView(4)"><span class="nav-icon">◕</span><span>準時率</span></a>
+        <a class="nav-item" id="nav-5" onclick="switchView(5)"><span class="nav-icon">⛯</span><span>設定</span></a>
     </div>
 
     <!-- 側邊攔選單 (滿版地圖時顯示) -->
@@ -364,12 +383,12 @@
             <h2>功能選單</h2>
         </div>
         <div class="side-menu-content">
-            <a class="side-nav-item active" id="side-nav-0" onclick="switchView(0, true); toggleSideMenu()"><span class="nav-icon">☗</span>首頁</a>
-            <a class="side-nav-item" id="side-nav-1" onclick="switchView(1, true); toggleSideMenu()"><span class="nav-icon">＄</span>收入</a>
-            <a class="side-nav-item" id="side-nav-2" onclick="switchView(2, true); toggleSideMenu()"><span class="nav-icon">♥&#xFE0E;</span>小費</a>
-            <a class="side-nav-item" id="side-nav-3" onclick="switchView(3, true); toggleSideMenu()"><span class="nav-icon">☈</span>成本</a>
-            <a class="side-nav-item" id="side-nav-4" onclick="switchView(4, true); toggleSideMenu()"><span class="nav-icon">◕</span>準時率</a>
-            <a class="side-nav-item" id="side-nav-5" onclick="switchView(5, true); toggleSideMenu()"><span class="nav-icon">⛯</span>設定</a>
+            <a class="side-nav-item active" id="side-nav-0" onclick="switchView(0); toggleSideMenu()"><span class="nav-icon">☗</span>首頁</a>
+            <a class="side-nav-item" id="side-nav-1" onclick="switchView(1); toggleSideMenu()"><span class="nav-icon">＄</span>收入</a>
+            <a class="side-nav-item" id="side-nav-2" onclick="switchView(2); toggleSideMenu()"><span class="nav-icon">♥&#xFE0E;</span>小費</a>
+            <a class="side-nav-item" id="side-nav-3" onclick="switchView(3); toggleSideMenu()"><span class="nav-icon">☈</span>成本</a>
+            <a class="side-nav-item" id="side-nav-4" onclick="switchView(4); toggleSideMenu()"><span class="nav-icon">◕</span>準時率</a>
+            <a class="side-nav-item" id="side-nav-5" onclick="switchView(5); toggleSideMenu()"><span class="nav-icon">⛯</span>設定</a>
         </div>
         <!-- 漢堡列底部的打卡按鈕 (僅滿版地圖顯示) -->
         <div style="padding: 20px; border-top: 1px solid var(--border); background: var(--card-bg);" id="side-menu-shift-section">
@@ -398,7 +417,7 @@
     <!-- 單日明細 Modal -->
     <div id="view-daily-detail">
         <div class="header" style="position: sticky; top: 0;">
-            <div style="width: 40px;"><button class="btn-icon" onclick="closeDailyDetail()">⇠</button></div>
+            <div style="width: 40px;"><button class="btn-icon" onclick="handleBack()">⇠</button></div>
             <div class="header-center"><h1 id="daily-detail-title">單日明細</h1></div>
             <div style="width: 40px;"></div>
         </div>
@@ -427,8 +446,29 @@
                     </div>
                 </div>
             </div>
+            
+            <div id="daily-detail-tabs" style="display:none; margin: 15px 0; border-bottom: 2px solid var(--border);">
+                <div style="display: flex;">
+                    <div id="tab-normal" class="detail-tab active" onclick="switchDailyTab('normal')">件數明細 (0)</div>
+                    <div id="tab-cancelled" class="detail-tab" onclick="switchDailyTab('cancelled')">取消訂單 (0)</div>
+                </div>
+            </div>
+
             <div class="section-title"><span id="daily-detail-list-title">件數明細</span></div>
             <div id="daily-detail-list"></div>
+        </div>
+    </div>
+
+    <!-- 取消訂單/刪除 Modal -->
+    <div class="modal-overlay" id="cancel-order-modal" onclick="if(event.target === this) closeModal('cancel-order-modal')">
+        <div class="modal-content" style="max-width: 320px; padding: 25px 20px; text-align: center;">
+            <h2 style="margin-bottom: 15px; color: var(--danger);">刪除/取消訂單</h2>
+            <p style="margin-bottom: 20px; font-size: 0.95rem; color: var(--text-main);">請問此訂單是否已經取餐？</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn" style="background:var(--success); border-color:var(--success);" onclick="confirmCancelTimer('picked')">已取餐 (結算金額並取消)</button>
+                <button class="btn" style="background:var(--danger); border-color:var(--danger);" onclick="confirmCancelTimer('unpicked')">未取餐 (直接刪除計時器)</button>
+                <button class="btn btn-outline" onclick="closeModal('cancel-order-modal')">返回取消操作</button>
+            </div>
         </div>
     </div>
 
@@ -473,7 +513,7 @@
         <div class="modal-content" style="max-width: 320px; padding: 25px 20px;">
             <h2 style="margin-bottom: 15px; text-align: center; color: var(--primary);" id="order-modal-title">輸入訂單號碼</h2>
             <div class="input-group">
-                <input type="text" id="order-number-input" class="form-control" placeholder="輸入單號 (例: 01, A3)" style="font-size: 1.2rem; text-align: center;" oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '')" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                <input type="number" inputmode="numeric" id="order-number-input" class="form-control" placeholder="輸入單號" style="font-size: 1.2rem; text-align: center;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-outline" onclick="closeModal('order-number-modal')">取消</button>
@@ -514,11 +554,11 @@
         <div class="modal-content">
             <h2 id="edit-modal-title" style="margin-bottom: 15px;">編輯紀錄</h2>
             <input type="hidden" id="edit-id"><input type="hidden" id="edit-category">
-            <div class="input-group"><label>金額</label><input type="number" id="edit-amount" class="form-control" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+            <div class="input-group"><label>金額</label><input type="number" inputmode="numeric" id="edit-amount" class="form-control" autocomplete="off" autocorrect="off" spellcheck="false"></div>
             <div class="input-group" id="edit-tip-fields" style="display:none;"><label>支付方式</label><select id="edit-tip-method" class="form-control"><option value="現金">現金</option><option value="刷卡">刷卡</option></select></div>
             <div id="edit-cost-fields" style="display:none;">
                 <div class="input-group"><label>類別</label><select id="edit-cost-type" class="form-control" onchange="toggleEditMileage()"><option value="加油">加油</option><option value="保養維修">保養維修</option><option value="周邊設備">周邊設備</option></select></div>
-                <div class="input-group" id="edit-mileage-group"><label>里程數 (選填)</label><input type="number" id="edit-cost-mileage" class="form-control" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+                <div class="input-group" id="edit-mileage-group"><label>里程數 (選填)</label><input type="number" inputmode="numeric" id="edit-cost-mileage" class="form-control" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                 <div class="input-group"><label>備註</label><input type="text" id="edit-cost-memo" class="form-control" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;"><button class="btn btn-outline" onclick="closeModal('edit-modal')">取消</button><button class="btn" onclick="saveEdit()">儲存修改</button></div>
