@@ -11,6 +11,24 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
+// 瀏覽器返回鍵狀態控制
+let isPopStateAction = false;
+window.addEventListener('popstate', (e) => {
+    isPopStateAction = true;
+    if (document.getElementById('view-daily-detail').classList.contains('active')) {
+        closeDailyDetail(true);
+    } else if (isSearchResultOpen) {
+        handleBack(true);
+    } else if (currentViewIndex !== 0) {
+        switchView(0, false, true);
+    }
+    setTimeout(() => isPopStateAction = false, 100);
+});
+
+function pushHistory() {
+    if (!isPopStateAction) history.pushState({}, '');
+}
+
 // Leaflet 地圖變數
 let mapInstance = null;
 let currentTileLayer = null;
@@ -120,13 +138,17 @@ function injectNewStyles() {
         body.map-enabled.on-home-view #shift-status-badge-right {
             display: none !important;
         }
+
+        /* ===== 單日明細標籤切換 ===== */
+        .detail-tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: 0.2s; }
+        .detail-tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
     `;
     document.head.appendChild(style);
 }
 
 /* ================== 自訂對話框引擎 ================== */
 let currentDialogResolve = null;
-function showCustomDialog({ type, title, message, defaultValue = '', confirmText = '確認', cancelText = '取消', isDanger = false }) {
+function showCustomDialog({ type, title, message, defaultValue = '', confirmText = '確認', cancelText = '取消', isDanger = false, isNumeric = false }) {
     return new Promise((resolve) => {
         currentDialogResolve = resolve;
         const modal = document.getElementById('custom-dialog-modal');
@@ -143,6 +165,13 @@ function showCustomDialog({ type, title, message, defaultValue = '', confirmText
         if (type === 'prompt') {
             inputGroup.style.display = 'block';
             inputEl.value = defaultValue;
+            if (isNumeric) {
+                inputEl.type = 'number';
+                inputEl.inputMode = 'numeric';
+            } else {
+                inputEl.type = 'text';
+                inputEl.inputMode = 'text';
+            }
         } else {
             inputGroup.style.display = 'none';
         }
@@ -194,7 +223,7 @@ function showCustomDialog({ type, title, message, defaultValue = '', confirmText
 
 async function appAlert(message, title = '提示') { return await showCustomDialog({ type: 'alert', title, message }); }
 async function appConfirm(message, title = '請確認', isDanger = false) { return await showCustomDialog({ type: 'confirm', title, message, isDanger }); }
-async function appPrompt(message, defaultValue = '', title = '請輸入') { return await showCustomDialog({ type: 'prompt', title, message, defaultValue }); }
+async function appPrompt(message, defaultValue = '', title = '請輸入', isNumeric = false) { return await showCustomDialog({ type: 'prompt', title, message, defaultValue, isNumeric }); }
 
 /* ================== 載入初始化 ================== */
 function loadSettingsForCurrentUser() {
@@ -212,6 +241,7 @@ function loadSettingsForCurrentUser() {
 }
 
 window.onload = function() {
+    history.replaceState({ view: 0 }, ''); // 記錄初始歷史狀態
     injectNewStyles();
     if (currentUser === '新使用者' && !localStorage.getItem(getStoreKey('order_history_records')) && localStorage.getItem('order_history_records')) {
         ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs'].forEach(k => { localStorage.setItem(getStoreKey(k), localStorage.getItem(k) || '[]'); });
@@ -358,7 +388,6 @@ function recenterMap(instant = false) {
     }
 }
 
-// 根據面板高度動態調整 Header 按鈕透明度
 window.updatePanelOpacity = function() {
     if (currentViewIndex !== 0 || !document.body.classList.contains('map-enabled')) return;
     const panel = document.getElementById('bottom-panel');
@@ -366,7 +395,6 @@ window.updatePanelOpacity = function() {
     const match = panel.style.transform.match(/translateY\(([-\d.]+)px\)/);
     const y = match ? parseFloat(match[1]) : window.innerHeight * 0.5;
     
-    // 面板距離頂端 <= 120px 時開始淡出 (因為按鈕高度約在 60-70px 左右)
     let opacity = Math.max(0, Math.min(1, y / 120));
     
     const els = [
@@ -394,9 +422,9 @@ function initBottomPanel() {
     function updatePanelDimensions() {
         let viewH = window.innerHeight;
         snapPoints = [
-            0,                  // 最高：完全展開到最頂部 (Top 0)
-            (viewH * 0.5) + 30, // 中間：預設停留在中間微下方
-            viewH - 160         // 最低：確保「提示那排字」能完全露出
+            0,              // 最高 (Top 0)
+            (viewH * 0.5) + 30,    // 中間
+            viewH - 160     // 最低
         ];
     }
 
@@ -422,7 +450,6 @@ function initBottomPanel() {
         isContentDragging = false;
     }, {passive: true});
 
-    // 處理面板拖曳與內容無縫滾動邏輯
     document.addEventListener('touchmove', (e) => {
         if (!document.body.classList.contains('map-enabled')) return;
         const currentY = e.touches[0].clientY;
@@ -439,20 +466,17 @@ function initBottomPanel() {
         } 
         else if (e.target.closest('#panel-scroll-content')) {
             const deltaY = currentY - contentStartY;
-            const isSwipingDown = deltaY > 0; // 手指往下滑動 (想看上方內容)
-            const isSwipingUp = deltaY < 0;   // 手指往上滑動 (想看下方內容)
+            const isSwipingDown = deltaY > 0; 
+            const isSwipingUp = deltaY < 0; 
             
-            // 判定滾動邊界，加入 2px 浮點數誤差容忍
             const isAtTop = content.scrollTop <= 0;
             const isAtBottom = Math.ceil(content.scrollTop + content.clientHeight) >= content.scrollHeight - 2;
             
             let shouldDrag = false;
             
-            // 如果手指往下滑且內容已在最頂端，則將面板拉下
             if (isSwipingDown && isAtTop) {
                 shouldDrag = true;
-            } 
-            // 如果手指往上滑且內容已在最底端 (或是內容長度不足以捲動)，則將面板推上
+            }
             else if (isSwipingUp && isAtBottom) {
                 shouldDrag = true;
             }
@@ -460,7 +484,6 @@ function initBottomPanel() {
             if (shouldDrag) {
                 if (e.cancelable) e.preventDefault(); 
                 
-                // 初次觸發拖曳時，轉換為拖曳模式並重置基準點
                 if (!isContentDragging) {
                     isContentDragging = true;
                     hasMoved = false;
@@ -682,10 +705,16 @@ function renderWeeklyData() {
     });
 
     const startTs = viewedWeekStart.getTime(), endTs = end.getTime();
+    
+    // 每週總額需包含 取消訂單 與 正常訂單
     const weeklyRecords = historyRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
     document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0));
     document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(shiftRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs).reduce((s, r) => s + r.durationMins, 0))}`;
-    renderStats(weeklyRecords, 'stats-list'); renderWeeklyChart('weekly-chart-income', weeklyRecords, 'income');
+    
+    // 圖表與明細排除取消訂單
+    const normalWeeklyRecords = weeklyRecords.filter(r => !r.isCancelled);
+    renderStats(normalWeeklyRecords, 'stats-list'); 
+    renderWeeklyChart('weekly-chart-income', normalWeeklyRecords, 'income');
 
     const weeklyTips = tipRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
     document.getElementById('weekly-total-amount-tips').innerText = fmtMoney(weeklyTips.reduce((sum, r) => sum + r.amount, 0));
@@ -761,7 +790,7 @@ const views = ['home', 'income', 'tips', 'costs', 'rate', 'settings'];
 const viewTitles = ['新使用者', '收入', '小費', '成本', '準時率', '設定']; 
 const viewHasSearch = [false, true, true, true, false, false]; 
 
-function switchView(index, isInstant = false) { 
+function switchView(index, isInstant = false, fromPopState = false) { 
     document.querySelectorAll('.date-card.active').forEach(c => c.classList.remove('active')); 
     const dailyDetail = document.getElementById('view-daily-detail');
     if (dailyDetail.classList.contains('active')) { dailyDetail.style.transition = 'none'; dailyDetail.classList.remove('active'); void dailyDetail.offsetWidth; dailyDetail.style.transition = 'transform 0.3s ease-out'; }
@@ -789,6 +818,7 @@ function switchView(index, isInstant = false) {
         setTimeout(() => mapInstance.invalidateSize(), 350);
     }
     
+    if (!fromPopState && index !== 0) pushHistory();
     updateUIState(); 
 }
 
@@ -894,7 +924,16 @@ function updateUIState() {
     } 
 }
 
-function handleBack() { if(document.getElementById('view-daily-detail').classList.contains('active')) closeDailyDetail(); else if (isSearchResultOpen) { document.getElementById('view-search-result').classList.remove('active'); isSearchResultOpen = false; updateUIState(); } }
+function handleBack(fromPopState = false) { 
+    if(document.getElementById('view-daily-detail').classList.contains('active')) {
+        closeDailyDetail(fromPopState); 
+    } else if (isSearchResultOpen) { 
+        document.getElementById('view-search-result').classList.remove('active'); 
+        isSearchResultOpen = false; 
+        updateUIState(); 
+        if (!fromPopState) history.back();
+    } 
+}
 
 function openUserModal(mode = 'switch') {
     const container = document.getElementById('user-list-container'); container.innerHTML = '';
@@ -1027,7 +1066,44 @@ async function stopTimer(id) {
     if (currentViewIndex === 4) calculatePunctuality();
 }
 
-function cancelTimer(id) { closeAllSwipes(); const index = activeTimers.findIndex(t => t.id === id); if (index > -1) { activeTimers.splice(index, 1); localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); checkWaitState(); } }
+let pendingCancelTimerId = null;
+function cancelTimer(id) { 
+    closeAllSwipes(); 
+    pendingCancelTimerId = id;
+    document.getElementById('cancel-order-modal').classList.add('active');
+}
+
+function confirmCancelTimer(action) {
+    closeModal('cancel-order-modal');
+    const id = pendingCancelTimerId;
+    const index = activeTimers.findIndex(t => t.id === id); 
+    if (index === -1) return; 
+    
+    if (action === 'unpicked') {
+        activeTimers.splice(index, 1);
+        localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); 
+        renderActiveTimers(); checkWaitState();
+    } else if (action === 'picked') {
+        const timer = activeTimers[index], endTime = Date.now(), diffMins = Math.max(1, Math.round((endTime - timer.startTime) / 60000)); 
+        const billableMins = Math.max(diffMins, timer.estimatedTime || 0);
+        let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
+        if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+        const endDateObj = new Date(endTime); 
+        
+        historyRecords.push({ 
+            id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], 
+            startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, 
+            amount: Number(amount.toFixed(2)), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '',
+            isCancelled: true
+        }); 
+        
+        activeTimers.splice(index, 1); 
+        localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); 
+        localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
+        renderActiveTimers(); renderWeeklyData(); checkWaitState(); 
+        if (currentViewIndex === 4) calculatePunctuality();
+    }
+}
 
 /* ================== 店家搜尋與綁定邏輯 ================== */
 function incrementOrderNumber(str) {
@@ -1065,12 +1141,12 @@ function selectStore(storeName) {
 }
 
 /* ================== 預估時間與刪除紀錄邏輯 ================== */
-async function setEstimatedTime(id) { closeAllSwipes(); const timer = activeTimers.find(t => t.id === id); if (!timer) return; const val = await appPrompt('請輸入預估時間 (分鐘):', timer.estimatedTime || '', '設定預估時間'); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { timer.estimatedTime = num; localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
+async function setEstimatedTime(id) { closeAllSwipes(); const timer = activeTimers.find(t => t.id === id); if (!timer) return; const val = await appPrompt('請輸入預估時間 (分鐘):', timer.estimatedTime || '', '設定預估時間', true); if (val !== null && val.trim() !== '') { const num = parseInt(val, 10); if (!isNaN(num) && num >= 0) { timer.estimatedTime = num; localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); } else { await appAlert('請輸入有效的數字', '錯誤'); } } }
 async function editHistoryEstimatedTime(id) { 
     closeAllSwipes(); 
     const record = historyRecords.find(r => r.id === id); 
     if (!record) return; 
-    const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間'); 
+    const val = await appPrompt('請輸入預估時間 (分鐘):', record.estimatedTime || '', '設定預估時間', true); 
     if (val !== null && val.trim() !== '') { 
         const num = parseInt(val, 10); 
         if (!isNaN(num) && num >= 0) { 
@@ -1081,14 +1157,14 @@ async function editHistoryEstimatedTime(id) {
             record.amount = Number(amount.toFixed(2)); 
             localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
             renderWeeklyData(); 
-            if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); 
+            if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); 
             if (currentViewIndex === 4) calculatePunctuality(); 
         } else { 
             await appAlert('請輸入有效的數字', '錯誤'); 
         } 
     } 
 }
-async function deleteHistoryRecord(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆收入紀錄嗎？', '刪除確認', true)) { historyRecords = historyRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); if (currentViewIndex === 4) calculatePunctuality(); } }
+async function deleteHistoryRecord(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆收入紀錄嗎？', '刪除確認', true)) { historyRecords = historyRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); if (currentViewIndex === 4) calculatePunctuality(); } }
 
 /* ================== 卡片拖曳排序邏輯 ================== */
 let pressTimer = null, isDraggingItem = false, dragTarget = null, placeholder = null, initialClientY = 0, currentTouchY = 0; 
@@ -1224,13 +1300,13 @@ async function editIncomeAmount(id) {
     if (newAmtStr !== null && newAmtStr.trim() !== '') {
         const numAmt = Number(newAmtStr); if (isNaN(numAmt) || numAmt < 0) { return await appAlert('請輸入有效的數字', '輸入錯誤'); }
         record.amount = numAmt; localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); 
-        if(document.getElementById('view-daily-detail').classList.contains('active')) { renderDailyDetail(); }
+        if(document.getElementById('view-daily-detail').classList.contains('active')) { renderDailyDetailList(); }
     }
 }
 
 /* ================== 小費與成本紀錄邏輯 ================== */
-async function deleteTip(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆小費紀錄嗎？', '刪除確認', true)) { tipRecords = tipRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); } } 
-async function deleteCost(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆成本紀錄嗎？', '刪除確認', true)) { costRecords = costRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); } }
+async function deleteTip(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆小費紀錄嗎？', '刪除確認', true)) { tipRecords = tipRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } 
+async function deleteCost(id) { closeAllSwipes(); if(await appConfirm('確定刪除這筆成本紀錄嗎？', '刪除確認', true)) { costRecords = costRecords.filter(t => t.id !== id); localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } }
 
 async function saveTip() { const amt = Number(document.getElementById('tip-amount').value); if(!amt || amt <= 0) return await appAlert('請輸入有效金額', '輸入錯誤'); const now = Date.now(), d = new Date(now); tipRecords.push({ id: 'tip_' + now, dateKey: getDateKey(now), year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), dayOfWeek: DAYS_MAP[d.getDay()], amount: amt, method: document.getElementById('tip-method').value, timestamp: now, timeStr: formatTime(d) }); localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); document.getElementById('tip-amount').value = ''; renderWeeklyData(); await appAlert('小費紀錄成功！', '成功'); }
 async function saveCost() { const amt = Number(document.getElementById('cost-amount').value); if(!amt || amt <= 0) return await appAlert('請輸入有效金額', '輸入錯誤'); const now = Date.now(), d = new Date(now); costRecords.push({ id: 'cost_' + now, dateKey: getDateKey(now), year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), dayOfWeek: DAYS_MAP[d.getDay()], amount: amt, type: document.getElementById('cost-type').value, memo: document.getElementById('cost-memo').value, mileage: document.getElementById('cost-mileage').value, timestamp: now, timeStr: formatTime(d) }); localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); document.getElementById('cost-amount').value = ''; document.getElementById('cost-memo').value = ''; document.getElementById('cost-mileage').value = ''; renderWeeklyData(); await appAlert('成本紀錄成功！', '成功'); }
@@ -1249,21 +1325,46 @@ function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amou
 }
 function renderTips(data = tipRecords, containerId = 'tips-list') { renderRecordGroup(data, containerId, '此區間尚無小費紀錄', 'tip', '筆小費'); }
 function renderCosts(data = costRecords, containerId = 'costs-list') { renderRecordGroup(data, containerId, '此區間尚無成本紀錄', 'cost', '筆成本', '支出 ', 'var(--text-main)'); }
-function renderStats(data = historyRecords, containerId = 'stats-list') { renderRecordGroup(data, containerId, '此區間尚無收入紀錄', 'income', '張訂單'); }
+function renderStats(data = historyRecords, containerId = 'stats-list') { 
+    // 首頁/搜尋列表只顯示正常訂單
+    renderRecordGroup(data.filter(r => !r.isCancelled), containerId, '此區間尚無收入紀錄', 'income', '張訂單'); 
+}
 
 /* ================== 單日明細 Modal 邏輯 ================== */
-function openDailyDetail(context, dateKey) { currentDailyContext = context; currentDailyDateObj = new Date(dateKey); document.getElementById('view-daily-detail').classList.add('active'); updateUIState(); renderDailyDetail(); }
-function closeDailyDetail() { document.getElementById('view-daily-detail').classList.remove('active'); updateUIState(); }
+let currentDailyTab = 'normal';
+
+function openDailyDetail(context, dateKey) { 
+    pushHistory();
+    currentDailyContext = context; currentDailyDateObj = new Date(dateKey); 
+    document.getElementById('view-daily-detail').classList.add('active'); 
+    updateUIState(); renderDailyDetail(); 
+}
+function closeDailyDetail(fromPopState = false) { 
+    document.getElementById('view-daily-detail').classList.remove('active'); 
+    updateUIState(); 
+    if (!fromPopState) history.back();
+}
 function prevDailyDetail() { currentDailyDateObj.setDate(currentDailyDateObj.getDate() - 1); renderDailyDetail(); }
 function nextDailyDetail() { currentDailyDateObj.setDate(currentDailyDateObj.getDate() + 1); renderDailyDetail(); }
+
+function switchDailyTab(tab) {
+    currentDailyTab = tab;
+    document.getElementById('tab-normal').classList.toggle('active', tab === 'normal');
+    document.getElementById('tab-cancelled').classList.toggle('active', tab === 'cancelled');
+    renderDailyDetailList();
+}
 
 function renderDailyDetail() {
     const dateKey = getDateKey(currentDailyDateObj.getTime());
     document.getElementById('daily-detail-date').innerText = `${currentDailyDateObj.getMonth() + 1}月${currentDailyDateObj.getDate()}日 ${DAYS_MAP[currentDailyDateObj.getDay()]}`;
     document.getElementById('daily-detail-week').innerText = `第${getWeekNumber(currentDailyDateObj)}週 ${currentDailyDateObj.getFullYear()}`;
     
-    const listContainer = document.getElementById('daily-detail-list'), statsGrid = document.getElementById('daily-detail-stats-grid');
-    let html = '';
+    const statsGrid = document.getElementById('daily-detail-stats-grid');
+    const tabsContainer = document.getElementById('daily-detail-tabs');
+    
+    currentDailyTab = 'normal';
+    document.getElementById('tab-normal').classList.add('active');
+    document.getElementById('tab-cancelled').classList.remove('active');
     
     if (currentDailyContext === 'income') {
         document.getElementById('daily-detail-type-label').innerText = '報酬 (當日總額)';
@@ -1280,28 +1381,56 @@ function renderDailyDetail() {
         document.getElementById('daily-detail-online-hours').innerText = formatMins(totalShiftMins);
         document.getElementById('daily-detail-wait-total').innerText = formatMins(totalWaitMins);
         document.getElementById('daily-detail-wait-max').innerText = formatMins(maxWaitMins);
-
-        if (dailyRecords.length === 0) html = '<div class="empty-state">今日無收入紀錄</div>';
-        else dailyRecords.forEach(r => {
-            const titleStr = r.storeName ? `<div style="font-weight:bold; color:var(--primary); margin-bottom:4px; font-size:1rem; word-break:break-word;">${r.storeName} #${r.orderNumber}</div>` : '';
-            html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
-        });
+        
+        tabsContainer.style.display = 'block';
     } else if (currentDailyContext === 'tip') {
         document.getElementById('daily-detail-type-label').innerText = '小費總額';
         const dailyRecords = tipRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
         document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
         document.getElementById('daily-detail-amount').style.color = 'var(--success)';
         statsGrid.style.display = 'none';
-
-        if (dailyRecords.length === 0) html = '<div class="empty-state">今日無小費紀錄</div>';
-        else dailyRecords.forEach(r => html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('tip', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr}</div><div class="record-desc">支付方式: ${r.method}</div></div><div class="record-amount">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteTip('${r.id}')">刪除</div></div></div>`);
+        tabsContainer.style.display = 'none';
     } else if (currentDailyContext === 'cost') {
         document.getElementById('daily-detail-type-label').innerText = '成本支出總額';
         const dailyRecords = costRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
         document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
         document.getElementById('daily-detail-amount').style.color = 'var(--text-main)';
         statsGrid.style.display = 'none';
+        tabsContainer.style.display = 'none';
+    }
+    
+    renderDailyDetailList();
+}
 
+function renderDailyDetailList() {
+    const listContainer = document.getElementById('daily-detail-list');
+    const dateKey = getDateKey(currentDailyDateObj.getTime());
+    let html = '';
+    
+    if (currentDailyContext === 'income') {
+        const allDaily = historyRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
+        const normals = allDaily.filter(r => !r.isCancelled);
+        const cancelleds = allDaily.filter(r => r.isCancelled);
+        
+        document.getElementById('tab-normal').innerText = `件數明細 (${normals.length})`;
+        document.getElementById('tab-cancelled').innerText = `取消訂單 (${cancelleds.length})`;
+        
+        const targetList = currentDailyTab === 'normal' ? normals : cancelleds;
+        
+        if (targetList.length === 0) {
+            html = `<div class="empty-state">此分類目前無紀錄</div>`;
+        } else {
+            targetList.forEach(r => {
+                const titleStr = r.storeName ? `<div style="font-weight:bold; color:var(--primary); margin-bottom:4px; font-size:1rem; word-break:break-word;">${r.storeName} #${r.orderNumber}</div>` : '';
+                html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
+            });
+        }
+    } else if (currentDailyContext === 'tip') {
+        const dailyRecords = tipRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
+        if (dailyRecords.length === 0) html = '<div class="empty-state">今日無小費紀錄</div>';
+        else dailyRecords.forEach(r => html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('tip', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr}</div><div class="record-desc">支付方式: ${r.method}</div></div><div class="record-amount">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteTip('${r.id}')">刪除</div></div></div>`);
+    } else if (currentDailyContext === 'cost') {
+        const dailyRecords = costRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
         if (dailyRecords.length === 0) html = '<div class="empty-state">今日無成本紀錄</div>';
         else dailyRecords.forEach(r => { let tags = `<span class="tag">${r.type}</span>`; if((r.type === '保養維修' || r.type === '加油') && r.mileage) tags += `<span class="tag">里程:${fmtNum(r.mileage)}</span>`; html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('cost', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr} ${tags}</div><div class="record-desc">${r.memo || '無備註'}</div></div><div class="record-amount" style="color:var(--text-main);">- ${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteCost('${r.id}')">刪除</div></div></div>`; });
     }
@@ -1310,10 +1439,13 @@ function renderDailyDetail() {
 
 /* ================== 編輯與查詢邏輯 ================== */
 function openEdit(category, id) { closeAllSwipes(); document.getElementById('edit-modal').classList.add('active'); document.getElementById('edit-id').value = id; document.getElementById('edit-category').value = category; if (category === 'tip') { document.getElementById('edit-modal-title').innerText = '編輯小費'; document.getElementById('edit-tip-fields').style.display = 'block'; document.getElementById('edit-cost-fields').style.display = 'none'; const record = tipRecords.find(t => t.id === id); document.getElementById('edit-amount').value = record.amount; document.getElementById('edit-tip-method').value = record.method; } else { document.getElementById('edit-modal-title').innerText = '編輯成本'; document.getElementById('edit-tip-fields').style.display = 'none'; document.getElementById('edit-cost-fields').style.display = 'block'; const record = costRecords.find(t => t.id === id); document.getElementById('edit-amount').value = record.amount; document.getElementById('edit-cost-type').value = record.type; document.getElementById('edit-cost-memo').value = record.memo || ''; toggleEditMileage(); if(record.type === '保養維修' || record.type === '加油') document.getElementById('edit-cost-mileage').value = record.mileage || ''; } }
-async function saveEdit() { const id = document.getElementById('edit-id').value, category = document.getElementById('edit-category').value, amount = Number(document.getElementById('edit-amount').value); if (!amount || amount <= 0) return await appAlert('請輸入有效金額', '輸入錯誤'); if (category === 'tip') { const idx = tipRecords.findIndex(t => t.id === id); if(idx > -1) { tipRecords[idx].amount = amount; tipRecords[idx].method = document.getElementById('edit-tip-method').value; localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); } } else { const idx = costRecords.findIndex(t => t.id === id); if(idx > -1) { const type = document.getElementById('edit-cost-type').value; costRecords[idx].amount = amount; costRecords[idx].type = type; costRecords[idx].memo = document.getElementById('edit-cost-memo').value; costRecords[idx].mileage = (type === '保養維修' || type === '加油') ? document.getElementById('edit-cost-mileage').value : ''; localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetail(); } } closeModal('edit-modal'); }
+async function saveEdit() { const id = document.getElementById('edit-id').value, category = document.getElementById('edit-category').value, amount = Number(document.getElementById('edit-amount').value); if (!amount || amount <= 0) return await appAlert('請輸入有效金額', '輸入錯誤'); if (category === 'tip') { const idx = tipRecords.findIndex(t => t.id === id); if(idx > -1) { tipRecords[idx].amount = amount; tipRecords[idx].method = document.getElementById('edit-tip-method').value; localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } else { const idx = costRecords.findIndex(t => t.id === id); if(idx > -1) { const type = document.getElementById('edit-cost-type').value; costRecords[idx].amount = amount; costRecords[idx].type = type; costRecords[idx].memo = document.getElementById('edit-cost-memo').value; costRecords[idx].mileage = (type === '保養維修' || type === '加油') ? document.getElementById('edit-cost-mileage').value : ''; localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } closeModal('edit-modal'); }
 
 let currentCalDate = new Date(), calSelStart = null, calSelEnd = null;
-function openFilterModal() { calSelStart = null; calSelEnd = null; renderCalendar(); document.getElementById('filter-modal').classList.add('active'); } function closeModal(id) { document.getElementById(id).classList.remove('active'); } function calPrevMonth() { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); } function calNextMonth() { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); }
+function openFilterModal() { pushHistory(); calSelStart = null; calSelEnd = null; renderCalendar(); document.getElementById('filter-modal').classList.add('active'); } 
+function closeModal(id) { document.getElementById(id).classList.remove('active'); } 
+function calPrevMonth() { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); } 
+function calNextMonth() { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); }
 
 function renderCalendar() { 
     const y = currentCalDate.getFullYear(), m = currentCalDate.getMonth(); 
@@ -1341,7 +1473,7 @@ function selectCalDate(y, m, d) { const t = new Date(y, m, d, 0, 0, 0).getTime()
 async function applyFilter() { 
     if (!calSelStart) return await appAlert('請先選擇日期', '操作錯誤'); 
     const sTime = calSelStart, eTime = (calSelEnd || calSelStart) + 86399999; 
-    const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
+    const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime && !r.isCancelled), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
     
     document.getElementById('search-total-orders').innerText = fInc.length + '張'; 
     document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); 
@@ -1359,44 +1491,9 @@ async function applyFilter() {
 }
 
 /* ================== 準時率 / 兩週週期計算邏輯 ================== */
-function calculatePunctuality() {
-    const buffer = Number(document.getElementById('rate-buffer-time').value) || 0;
-    const now = Date.now();
-    
-    const anchor = new Date(2026, 7, 17).setHours(0,0,0,0);
-    const cycleMs = 14 * 24 * 60 * 60 * 1000;
-    const weekMs = 7 * 24 * 60 * 60 * 1000;
-    
-    let startMs = anchor;
-    let diff = now - anchor;
-    if (diff >= 0) { startMs = anchor + Math.floor(diff / cycleMs) * cycleMs; } else { startMs = anchor - Math.ceil(Math.abs(diff) / cycleMs) * cycleMs; }
-    let endMs = startMs + cycleMs - 1;
-    let isWeek2 = (now - startMs) >= weekMs;
-    
-    const validRecords = historyRecords.filter(r => r.estimatedTime && r.estimatedTime > 0 && r.timestamp >= startMs && r.timestamp <= endMs);
-    
-    const d1 = new Date(startMs), d2 = new Date(endMs);
-    const cycleStr = `${d1.getFullYear()}/${d1.getMonth()+1}/${d1.getDate()} - ${d2.getMonth()+1}/${d2.getDate()}`;
-    const weekStr = isWeek2 ? '第二週' : '第一週';
-    
-    let cycleInfoEl = document.getElementById('punctuality-cycle-info');
-    if (!cycleInfoEl) {
-        cycleInfoEl = document.createElement('div');
-        cycleInfoEl.id = 'punctuality-cycle-info';
-        cycleInfoEl.style.fontSize = '0.85rem';
-        cycleInfoEl.style.color = 'var(--text-muted)';
-        cycleInfoEl.style.marginBottom = '10px';
-        document.getElementById('card-punctuality').insertBefore(cycleInfoEl, document.getElementById('punctuality-ontime').parentNode.parentNode);
-    }
-    cycleInfoEl.innerHTML = `週期: <b style="color:var(--primary);">${cycleStr}</b> (目前為${weekStr})`;
-
-    if (validRecords.length === 0) {
-        document.getElementById('punctuality-ontime').innerText = '--%';
-        document.getElementById('punctuality-avg-timeout').innerText = '--%';
-        document.getElementById('punctuality-total-timeout').innerText = '--%';
-        document.getElementById('punctuality-diff-amount').innerText = '$0.00';
-        return;
-    }
+function getPunctualityStats(records, startMs, endMs, buffer) {
+    const validRecords = records.filter(r => r.estimatedTime && r.estimatedTime > 0 && r.timestamp >= startMs && r.timestamp <= endMs && !r.isCancelled);
+    if (validRecords.length === 0) return null;
 
     let onTimeCount = 0, singleTimeoutRates = [], totalActual = 0, totalEstimatedWithBuffer = 0;
     let totalActualAmount = 0, totalEstimatedAmount = 0;
@@ -1417,14 +1514,73 @@ function calculatePunctuality() {
     const avgTimeoutRate = (singleTimeoutRates.reduce((a, b) => a + b, 0) / validRecords.length) * 100;
     let totalTimeoutRate = 0;
     if (totalActual > totalEstimatedWithBuffer && totalEstimatedWithBuffer > 0) { totalTimeoutRate = ((totalActual - totalEstimatedWithBuffer) / totalEstimatedWithBuffer) * 100; }
-
+    
     let diffAmount = totalActualAmount - totalEstimatedAmount;
     if (diffAmount < 0) diffAmount = 0;
 
-    document.getElementById('punctuality-ontime').innerText = onTimeRate.toFixed(1) + '%';
-    document.getElementById('punctuality-avg-timeout').innerText = avgTimeoutRate.toFixed(1) + '%';
-    document.getElementById('punctuality-total-timeout').innerText = totalTimeoutRate.toFixed(1) + '%';
-    document.getElementById('punctuality-diff-amount').innerText = fmtMoney(diffAmount);
+    return { onTimeRate, avgTimeoutRate, totalTimeoutRate, diffAmount };
+}
+
+function calculatePunctuality() {
+    const buffer = Number(document.getElementById('rate-buffer-time').value) || 0;
+    const now = Date.now();
+    
+    const anchor = new Date(2026, 7, 17).setHours(0,0,0,0);
+    const cycleMs = 14 * 24 * 60 * 60 * 1000;
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    
+    let startMs = anchor;
+    let diff = now - anchor;
+    if (diff >= 0) { startMs = anchor + Math.floor(diff / cycleMs) * cycleMs; } else { startMs = anchor - Math.ceil(Math.abs(diff) / cycleMs) * cycleMs; }
+    let endMs = startMs + cycleMs - 1;
+    let isWeek2 = (now - startMs) >= weekMs;
+    
+    const d1 = new Date(startMs), d2 = new Date(endMs);
+    const cycleStr = `${d1.getFullYear()}/${d1.getMonth()+1}/${d1.getDate()} - ${d2.getMonth()+1}/${d2.getDate()}`;
+    const weekStr = isWeek2 ? '第二週' : '第一週';
+    
+    let cycleInfoEl = document.getElementById('punctuality-cycle-info');
+    if (!cycleInfoEl) {
+        cycleInfoEl = document.createElement('div');
+        cycleInfoEl.id = 'punctuality-cycle-info';
+        cycleInfoEl.style.fontSize = '0.85rem';
+        cycleInfoEl.style.color = 'var(--text-muted)';
+        cycleInfoEl.style.marginBottom = '10px';
+        document.getElementById('card-punctuality').insertBefore(cycleInfoEl, document.getElementById('punctuality-ontime').parentNode.parentNode);
+    }
+    cycleInfoEl.innerHTML = `週期: <b style="color:var(--primary);">${cycleStr}</b> (目前為${weekStr})`;
+
+    const currentStats = getPunctualityStats(historyRecords, startMs, endMs, buffer);
+    if (!currentStats) {
+        document.getElementById('punctuality-ontime').innerText = '--%';
+        document.getElementById('punctuality-avg-timeout').innerText = '--%';
+        document.getElementById('punctuality-total-timeout').innerText = '--%';
+        document.getElementById('punctuality-diff-amount').innerText = '$0.00';
+    } else {
+        document.getElementById('punctuality-ontime').innerText = currentStats.onTimeRate.toFixed(1) + '%';
+        document.getElementById('punctuality-avg-timeout').innerText = currentStats.avgTimeoutRate.toFixed(1) + '%';
+        document.getElementById('punctuality-total-timeout').innerText = currentStats.totalTimeoutRate.toFixed(1) + '%';
+        document.getElementById('punctuality-diff-amount').innerText = fmtMoney(currentStats.diffAmount);
+    }
+
+    // 計算前一期
+    const prevStartMs = startMs - cycleMs;
+    const prevEndMs = endMs - cycleMs;
+    const p1 = new Date(prevStartMs), p2 = new Date(prevEndMs);
+    document.getElementById('prev-punctuality-cycle-info').innerText = `${p1.getFullYear()}/${p1.getMonth()+1}/${p1.getDate()} - ${p2.getMonth()+1}/${p2.getDate()}`;
+    
+    const prevStats = getPunctualityStats(historyRecords, prevStartMs, prevEndMs, buffer);
+    if (!prevStats) {
+        document.getElementById('prev-punctuality-ontime').innerText = '--%';
+        document.getElementById('prev-punctuality-avg-timeout').innerText = '--%';
+        document.getElementById('prev-punctuality-total-timeout').innerText = '--%';
+        document.getElementById('prev-punctuality-diff-amount').innerText = '$0.00';
+    } else {
+        document.getElementById('prev-punctuality-ontime').innerText = prevStats.onTimeRate.toFixed(1) + '%';
+        document.getElementById('prev-punctuality-avg-timeout').innerText = prevStats.avgTimeoutRate.toFixed(1) + '%';
+        document.getElementById('prev-punctuality-total-timeout').innerText = prevStats.totalTimeoutRate.toFixed(1) + '%';
+        document.getElementById('prev-punctuality-diff-amount').innerText = fmtMoney(prevStats.diffAmount);
+    }
 }
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
