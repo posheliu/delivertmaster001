@@ -11,6 +11,22 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
+// 導航專用精緻向量圖示 (SVG)
+const NAV_ICONS = [
+    // 0: 首頁 (House)
+    `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
+    // 1: 收入 (Wallet)
+    `<svg viewBox="0 0 24 24"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M16 12h6v4h-6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z"/><circle cx="18" cy="14" r="1"/></svg>`,
+    // 2: 小費 (Hand with Coins)
+    `<svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg>`,
+    // 3: 成本 (Receipt)
+    `<svg viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>`,
+    // 4: 準時率 (Clock Check)
+    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/><path d="m16 9 2 2 4-4"/></svg>`,
+    // 5: 設定 (Gear)
+    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+];
+
 // 瀏覽器返回鍵狀態控制
 let isPopStateAction = false;
 window.addEventListener('popstate', (e) => {
@@ -55,35 +71,27 @@ function injectNewStyles() {
     style.id = 'injected-new-styles';
     style.innerHTML = `
         .swipe-edit { position: absolute; top: 0; left: -80px; bottom: 0; width: 80px; background: var(--primary); color: var(--btn-text); display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1rem; cursor: pointer; z-index: 10; box-shadow: inset -2px 0 5px rgba(0,0,0,0.1); }
-        /* 解決非滿版地圖時，各明細最底端被導航列擋住的問題 */
         body:not(.map-enabled) #stats-list, 
         body:not(.map-enabled) #tips-list, 
         body:not(.map-enabled) #costs-list { padding-bottom: 80px; }
-        /* 未啟用滿版地圖時，隱藏把手但保留文字區塊 */
         body:not(.map-enabled) .handle-bar-wrapper { display: none !important; }
         body:not(.map-enabled) .panel-header { cursor: default !important; }
-        
-        /* ===== 未啟用滿版地圖時，隱藏左上角狀態列(漢堡)按鈕 ===== */
         body:not(.map-enabled) #btn-menu { display: none !important; }
         
-        /* ===== 保證 Leaflet 地圖在各裝置上絕對能顯示尺寸 ===== */
         body.map-enabled #map {
             display: block !important;
             width: 100vw !important;
             height: 100vh !important;
         }
 
-        /* ===== 啟用滿版地圖時，隱藏底部導航列 ===== */
         body.map-enabled .bottom-nav { display: none !important; }
 
-        /* ===== 滿版地圖面板最高點：覆蓋整個畫面 (高度100vh) ===== */
         body.map-enabled .bottom-panel {
             top: 0 !important;
             height: 100vh !important;
-            z-index: 90 !important; /* Header is 100 */
+            z-index: 90 !important;
         }
 
-        /* ===== 左側選單 (狀態列) 樣式 ===== */
         .side-menu-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 2999; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
         .side-menu-overlay.active { opacity: 1; visibility: visible; }
         
@@ -99,7 +107,6 @@ function injectNewStyles() {
         .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; }
         .side-nav-item.active { background: var(--timer-bg); color: var(--primary); font-weight: bold; border-left: 4px solid var(--primary); }
 
-        /* ===== 滿版地圖模式下的頂部 Header 透明化 (僅限於首頁) ===== */
         body.map-enabled.on-home-view .header {
             background: transparent !important;
             box-shadow: none !important;
@@ -139,7 +146,6 @@ function injectNewStyles() {
             display: none !important;
         }
 
-        /* ===== 單日明細標籤切換 ===== */
         .detail-tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: 0.2s; }
         .detail-tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
     `;
@@ -241,7 +247,7 @@ function loadSettingsForCurrentUser() {
 }
 
 window.onload = function() {
-    history.replaceState({ view: 0 }, ''); // 記錄初始歷史狀態
+    history.replaceState({ view: 0 }, '');
     injectNewStyles();
     if (currentUser === '新使用者' && !localStorage.getItem(getStoreKey('order_history_records')) && localStorage.getItem('order_history_records')) {
         ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs'].forEach(k => { localStorage.setItem(getStoreKey(k), localStorage.getItem(k) || '[]'); });
@@ -422,9 +428,9 @@ function initBottomPanel() {
     function updatePanelDimensions() {
         let viewH = window.innerHeight;
         snapPoints = [
-            0,              // 最高 (Top 0)
-            (viewH * 0.5) + 30,    // 中間
-            viewH - 160     // 最低
+            0,
+            (viewH * 0.5) + 30,
+            viewH - 160
         ];
     }
 
@@ -706,12 +712,10 @@ function renderWeeklyData() {
 
     const startTs = viewedWeekStart.getTime(), endTs = end.getTime();
     
-    // 每週總額需包含 取消訂單 與 正常訂單
     const weeklyRecords = historyRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
     document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0));
     document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(shiftRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs).reduce((s, r) => s + r.durationMins, 0))}`;
     
-    // 圖表與明細排除取消訂單
     const normalWeeklyRecords = weeklyRecords.filter(r => !r.isCancelled);
     renderStats(normalWeeklyRecords, 'stats-list'); 
     renderWeeklyChart('weekly-chart-income', normalWeeklyRecords, 'income');
@@ -851,32 +855,42 @@ function toggleSideMenu() {
 }
 
 function updateUIState() { 
-    const unselectedIcons = ['☖', '＄', '♡', '☇', '◑', '⛭'], selectedIcons = ['☗', '＄', '♥\uFE0E', '☈', '◕', '⛯'];
-    
-    // 底部導航同步
+    // 底部導航同步 (套用向量 SVG 圖示)
     document.querySelectorAll('.bottom-nav .nav-item').forEach((el, index) => { 
         el.classList.remove('active'); 
         const iconSpan = el.querySelector('.nav-icon'); 
-        if (iconSpan) { iconSpan.innerText = unselectedIcons[index]; iconSpan.style.transform = 'scale(1)'; } 
+        if (iconSpan) { 
+            iconSpan.innerHTML = NAV_ICONS[index]; 
+            iconSpan.style.transform = 'scale(1)'; 
+        } 
     }); 
     const activeNavBottom = document.getElementById(`nav-${currentViewIndex}`); 
     if(activeNavBottom) {
         activeNavBottom.classList.add('active'); 
         const activeIconSpan = activeNavBottom.querySelector('.nav-icon');
-        if (activeIconSpan) { activeIconSpan.innerText = selectedIcons[currentViewIndex]; if ([2, 4].includes(currentViewIndex)) activeIconSpan.style.transform = 'scale(1.25)'; }
+        if (activeIconSpan) { 
+            activeIconSpan.innerHTML = NAV_ICONS[currentViewIndex]; 
+            activeIconSpan.style.transform = 'scale(1.1)'; 
+        }
     }
 
-    // 側邊選單同步
+    // 側邊選單同步 (套用向量 SVG 圖示)
     document.querySelectorAll('.side-nav-item').forEach((el, index) => { 
         el.classList.remove('active'); 
         const iconSpan = el.querySelector('.nav-icon'); 
-        if (iconSpan) { iconSpan.innerText = unselectedIcons[index]; iconSpan.style.transform = 'scale(1)'; } 
+        if (iconSpan) { 
+            iconSpan.innerHTML = NAV_ICONS[index]; 
+            iconSpan.style.transform = 'scale(1)'; 
+        } 
     }); 
     const activeNavSide = document.getElementById(`side-nav-${currentViewIndex}`); 
     if(activeNavSide) {
         activeNavSide.classList.add('active'); 
         const activeIconSpan = activeNavSide.querySelector('.nav-icon');
-        if (activeIconSpan) { activeIconSpan.innerText = selectedIcons[currentViewIndex]; if ([2, 4].includes(currentViewIndex)) activeIconSpan.style.transform = 'scale(1.25)'; }
+        if (activeIconSpan) { 
+            activeIconSpan.innerHTML = NAV_ICONS[currentViewIndex]; 
+            activeIconSpan.style.transform = 'scale(1.1)'; 
+        }
     }
 
     const title = document.getElementById('header-title');
@@ -1277,9 +1291,18 @@ function renderActiveTimers() {
         return;
     }
     let html = '';
+    const now = Date.now();
     activeTimers.forEach((timer, idx) => {
         const titleStr = timer.storeName ? `${timer.storeName} #${timer.orderNumber}` : `訂單計時 #${idx + 1}`;
-        const estStr = timer.estimatedTime ? `<span style="white-space:nowrap; color:var(--primary); font-size:0.85rem; margin-left:8px; border:1px solid var(--primary); padding:1px 4px; border-radius:4px;">預估 ${timer.estimatedTime}m</span>` : '';
+        
+        // Notion 風格同色系狀態標籤：即時判定是否超時
+        let estStr = '';
+        if (timer.estimatedTime) {
+            const isOverdue = (now - timer.startTime) > timer.estimatedTime * 60000;
+            const badgeClass = isOverdue ? 'est-badge-overdue' : 'est-badge-ontime';
+            estStr = `<span id="est_badge_${timer.id}" class="est-badge ${badgeClass}">預估 ${timer.estimatedTime}分鐘</span>`;
+        }
+        
         html += `<div class="swipe-container active-timer-container" data-id="${timer.id}"><div class="swipe-content active-timer-content" onmousedown="handleItemTouchStart(event)" ontouchstart="handleItemTouchStart(event)" onmousemove="handleItemTouchMove(event)" ontouchmove="handleItemTouchMove(event)" onmouseup="handleItemTouchEnd(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)" onmouseleave="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="setEstimatedTime('${timer.id}')">預估</div><div class="timer-info"><h3 onclick="handleTimerTitleClick('${timer.id}')">${titleStr} ${estStr}</h3><p>開始時間：${formatTime(new Date(timer.startTime))}</p><div class="timer-duration" id="duration_${timer.id}">00:00:00</div></div><button class="btn-stop" onclick="stopTimer('${timer.id}')">配送</button><div class="swipe-delete" onclick="cancelTimer('${timer.id}')">刪除</div></div></div>`;
     });
     listEl.innerHTML = html; 
@@ -1289,8 +1312,21 @@ function renderActiveTimers() {
 
 function updateTimersDisplay() {
     const now = Date.now();
-    activeTimers.forEach(timer => { const el = document.getElementById(`duration_${timer.id}`); if (el) el.innerText = formatDuration(now - timer.startTime); });
-    if (activeShift) { const shiftEls = document.querySelectorAll('.shift-current-duration-class'); shiftEls.forEach(el => el.innerText = formatDuration(now - activeShift.startTime)); } checkWaitState();
+    activeTimers.forEach(timer => { 
+        const el = document.getElementById(`duration_${timer.id}`); 
+        if (el) el.innerText = formatDuration(now - timer.startTime); 
+        
+        // 每秒即時動態比對計時器與預估時間，超時自動切換為土色，範圍內保持綠色
+        if (timer.estimatedTime) {
+            const estEl = document.getElementById(`est_badge_${timer.id}`);
+            if (estEl) {
+                const isOverdue = (now - timer.startTime) > timer.estimatedTime * 60000;
+                estEl.className = `est-badge ${isOverdue ? 'est-badge-overdue' : 'est-badge-ontime'}`;
+            }
+        }
+    });
+    if (activeShift) { const shiftEls = document.querySelectorAll('.shift-current-duration-class'); shiftEls.forEach(el => el.innerText = formatDuration(now - activeShift.startTime)); } 
+    checkWaitState();
 }
 
 /* ================== 修改訂單(收入)金額邏輯 ================== */
@@ -1326,7 +1362,6 @@ function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amou
 function renderTips(data = tipRecords, containerId = 'tips-list') { renderRecordGroup(data, containerId, '此區間尚無小費紀錄', 'tip', '筆小費'); }
 function renderCosts(data = costRecords, containerId = 'costs-list') { renderRecordGroup(data, containerId, '此區間尚無成本紀錄', 'cost', '筆成本', '支出 ', 'var(--text-main)'); }
 function renderStats(data = historyRecords, containerId = 'stats-list') { 
-    // 首頁/搜尋列表只顯示正常訂單
     renderRecordGroup(data.filter(r => !r.isCancelled), containerId, '此區間尚無收入紀錄', 'income', '張訂單'); 
 }
 
