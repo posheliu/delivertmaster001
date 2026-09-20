@@ -108,16 +108,19 @@
         <div id="view-income" class="view-section">
             <div class="card" style="text-align: center; padding: 20px 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn-icon" onclick="prevWeek()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">◂</button>
+                    <!-- 放大加粗的切換箭頭 -->
+                    <button class="btn-icon" onclick="prevWeek()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">◀</button>
                     <div>
                         <div id="weekly-date-range" style="font-weight: bold; color: var(--primary); font-size:1.05rem;">讀取中...</div>
                         <div id="weekly-week-number" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;"></div>
                     </div>
-                    <button class="btn-icon" onclick="nextWeek()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">▸</button>
+                    <!-- 放大加粗的切換箭頭 -->
+                    <button class="btn-icon" onclick="nextWeek()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">▶</button>
                 </div>
                 <div style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 15px;">
                     <div style="font-size: 0.9rem; color: var(--text-muted);">本週收入總額</div>
-                    <div id="weekly-total-amount" style="font-size: 2.5rem; font-weight: bold; color: var(--success); margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.05);">$0.00</div>
+                    <!-- 恢復為原先的深綠色 -->
+                    <div id="weekly-total-amount" style="font-size: 2.5rem; font-weight: bold; color: #238551; margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.05);">$0.00</div>
                     <div id="weekly-online-hours" style="font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; font-weight:bold;">上線時數: 0小時0分鐘</div>
                 </div>
                 <div id="weekly-chart-income" class="chart-container"></div>
@@ -130,16 +133,16 @@
         <div id="view-tips" class="view-section">
             <div class="card" style="text-align: center; padding: 20px 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn-icon" onclick="prevWeek()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">◂</button>
+                    <button class="btn-icon" onclick="prevWeek()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">◀</button>
                     <div>
                         <div id="weekly-date-range-tips" style="font-weight: bold; color: var(--primary); font-size:1.05rem;">讀取中...</div>
                         <div id="weekly-week-number-tips" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;"></div>
                     </div>
-                    <button class="btn-icon" onclick="nextWeek()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">▸</button>
+                    <button class="btn-icon" onclick="nextWeek()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">▶</button>
                 </div>
                 <div style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 15px;">
                     <div style="font-size: 0.9rem; color: var(--text-muted);">本週小費總額</div>
-                    <div id="weekly-total-amount-tips" style="font-size: 2.5rem; font-weight: bold; color: var(--success); margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.05);">$0.00</div>
+                    <div id="weekly-total-amount-tips" style="font-size: 2.5rem; font-weight: bold; color: #238551; margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.05);">$0.00</div>
                 </div>
                 <div id="weekly-chart-tips" class="chart-container"></div>
             </div>
@@ -162,12 +165,12 @@
         <div id="view-costs" class="view-section">
             <div class="card" style="text-align: center; padding: 20px 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn-icon" onclick="prevWeek()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">◂</button>
+                    <button class="btn-icon" onclick="prevWeek()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">◀</button>
                     <div>
                         <div id="weekly-date-range-costs" style="font-weight: bold; color: var(--primary); font-size:1.05rem;">讀取中...</div>
                         <div id="weekly-week-number-costs" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;"></div>
                     </div>
-                    <button class="btn-icon" onclick="nextWeek()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">▸</button>
+                    <button class="btn-icon" onclick="nextWeek()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">▶</button>
                 </div>
                 <div style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 15px;">
                     <div style="font-size: 0.9rem; color: var(--text-muted);">本週成本總額</div>
@@ -216,13 +219,13 @@
                 
                 <!-- 本期資料 -->
                 <div class="summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border);">
-                    <div class="summary-item"><span>準時率</span><strong style="color:var(--success);" id="punctuality-ontime">--%</strong></div>
+                    <div class="summary-item"><span>準時率</span><strong style="color:#238551;" id="punctuality-ontime">--%</strong></div>
                     <div class="summary-item"><span>單筆超時(平均)</span><strong style="color:var(--danger);" id="punctuality-avg-timeout">--%</strong></div>
                     <div class="summary-item"><span>總超時率</span><strong style="color:var(--danger);" id="punctuality-total-timeout">--%</strong></div>
                 </div>
                 <div style="margin-top: 15px; padding: 15px; background: var(--timer-bg); border-radius: 12px; border: 1px solid var(--border); text-align: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
                     <div style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 5px;">本期預計補發</div>
-                    <div id="punctuality-diff-amount" style="font-size: 1.8rem; font-weight: bold; color: var(--success); text-shadow: 0 1px 2px rgba(0,0,0,0.05);">$0.00</div>
+                    <div id="punctuality-diff-amount" style="font-size: 1.8rem; font-weight: bold; color: #238551; text-shadow: 0 1px 2px rgba(0,0,0,0.05);">$0.00</div>
                 </div>
 
                 <!-- 前一期資料 -->
@@ -232,13 +235,13 @@
                         <span id="prev-punctuality-cycle-info" style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">讀取中...</span>
                     </h3>
                     <div class="summary-block" style="margin-top: 0; padding-top: 0; border-top: none;">
-                        <div class="summary-item"><span>準時率</span><strong style="color:var(--success); font-size:1.1rem;" id="prev-punctuality-ontime">--%</strong></div>
+                        <div class="summary-item"><span>準時率</span><strong style="color:#238551; font-size:1.1rem;" id="prev-punctuality-ontime">--%</strong></div>
                         <div class="summary-item"><span>單筆超時</span><strong style="color:var(--danger); font-size:1.1rem;" id="prev-punctuality-avg-timeout">--%</strong></div>
                         <div class="summary-item"><span>總超時率</span><strong style="color:var(--danger); font-size:1.1rem;" id="prev-punctuality-total-timeout">--%</strong></div>
                     </div>
                     <div style="margin-top: 15px; padding: 10px; background: var(--page-bg); border-radius: 8px; border: 1px solid rgba(0,0,0,0.05); text-align: center;">
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 2px;">前期預計補發</div>
-                        <div id="prev-punctuality-diff-amount" style="font-size: 1.3rem; font-weight: bold; color: var(--success);">$0.00</div>
+                        <div id="prev-punctuality-diff-amount" style="font-size: 1.3rem; font-weight: bold; color: #238551;">$0.00</div>
                     </div>
                 </div>
 
@@ -474,14 +477,14 @@
         </div>
     </div>
 
-    <!-- 月曆過濾查詢 Modal -->
-    <div id="view-search-result">
+    <!-- 月曆過濾查詢 Modal (強制實心白底，防止下層文字透出) -->
+    <div id="view-search-result" style="background: #ffffff !important;">
         <div class="card">
             <h2 id="search-date-range" style="text-align:center; color:var(--primary);">日期範圍</h2>
             <div class="summary-block">
                 <div class="summary-item"><span>總單量</span><strong style="color:var(--primary);" id="search-total-orders">0張</strong></div>
-                <div class="summary-item"><span>總收入</span><strong style="color:var(--success);" id="search-total-income">$0.00</strong></div>
-                <div class="summary-item"><span>總小費</span><strong style="color:var(--success);" id="search-total-tips">$0.00</strong></div>
+                <div class="summary-item"><span>總收入</span><strong style="color:#238551;" id="search-total-income">$0.00</strong></div>
+                <div class="summary-item"><span>總小費</span><strong style="color:#238551;" id="search-total-tips">$0.00</strong></div>
                 <div class="summary-item"><span>總成本</span><strong style="color:var(--text-main);" id="search-total-costs">-$0.00</strong></div>
             </div>
         </div>
@@ -490,8 +493,8 @@
         <div class="section-title"><span>成本明細</span></div><div id="search-costs-list"></div>
     </div>
 
-    <!-- 單日明細 Modal -->
-    <div id="view-daily-detail">
+    <!-- 單日明細 Modal (強制實心白底，防止下層文字透出) -->
+    <div id="view-daily-detail" style="background: #ffffff !important;">
         <div class="header" style="position: sticky; top: 0;">
             <div style="width: 40px;"><button class="btn-icon" onclick="handleBack()">⇠</button></div>
             <div class="header-center"><h1 id="daily-detail-title">單日明細</h1></div>
@@ -500,16 +503,16 @@
         <div style="padding: 16px; padding-bottom: 120px;">
             <div class="card" style="text-align:center;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn-icon" onclick="prevDailyDetail()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">◂</button>
+                    <button class="btn-icon" onclick="prevDailyDetail()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">◀</button>
                     <div>
                         <div id="daily-detail-date" style="font-weight: bold; color: var(--primary); font-size:1.15rem;">讀取中</div>
                         <div id="daily-detail-week" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">讀取中</div>
                     </div>
-                    <button class="btn-icon" onclick="nextDailyDetail()" style="background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.05);">▸</button>
+                    <button class="btn-icon" onclick="nextDailyDetail()" style="width:36px; height:36px; background:var(--timer-bg); border-radius:50%; box-shadow:0 2px 4px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; font-size:1rem; color:var(--primary); border:none;">▶</button>
                 </div>
                 <div style="margin-top: 20px; border-top: 1px dashed var(--border); padding-top: 15px;">
                     <div id="daily-detail-type-label" style="font-size: 0.9rem; color: var(--text-muted);">總額</div>
-                    <div id="daily-detail-amount" style="font-size: 2.5rem; font-weight: bold; color: var(--success); margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.05);">$0.00</div>
+                    <div id="daily-detail-amount" style="font-size: 2.5rem; font-weight: bold; color: #238551; margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.05);">$0.00</div>
                 </div>
                 <div id="daily-detail-stats-grid" style="display:none; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px;">
                     <div style="background:var(--timer-bg); padding:12px; border-radius:12px; border:1px solid var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
