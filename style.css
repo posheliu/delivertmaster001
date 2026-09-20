@@ -13,7 +13,7 @@
     --border: #fecdd3;
     --text-main: #1e293b;
     --text-muted: #64748b;
-    --success: #10b981;
+    --success: #238551; /* 沉穩深綠色 */
     --danger: #ef4444;
     --danger-text: #ffffff;
 }
@@ -139,6 +139,9 @@ body {
     padding: 8px;
     border-radius: 8px;
     transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-icon:active {
@@ -183,7 +186,7 @@ body {
     z-index: 1;
 }
 
-/* 🎯 定位方向標記 (正圓鎖定，防止拉伸變形) */
+/* 🎯 定位方向標記 (正圓鎖定，徹底防止拉伸變形) */
 .custom-blue-dot-container {
     width: 18px !important;
     height: 18px !important;
@@ -319,32 +322,34 @@ body:not(.map-enabled) .map-btn-recenter {
     border: 1px solid var(--border);
 }
 
-/* Notion 風格低飽和狀態標籤 (Notion-style Badges) */
+/* Notion 風格低飽和狀態標籤：徹底去除邊框，還原軟性底色 */
 .est-badge {
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.75rem;
-    font-weight: 500;
-    padding: 2px 8px;
-    border-radius: 6px;
-    margin-left: 6px;
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    padding: 2px 8px !important;
+    border-radius: 6px !important;
+    margin-left: 6px !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     vertical-align: middle;
-    letter-spacing: 0.2px;
     line-height: 1.3;
 }
 
-/* 準時未超時：柔和綠底 + 墨綠字 */
+/* 準時未超時：柔和綠底 + 墨綠字 (無邊框) */
 .est-badge-ontime {
-    background: #eef8f2;
-    color: #2b7a4b;
-    border: 1px solid #d4edd9;
+    background-color: #edf6ee !important;
+    color: #2e7d32 !important;
+    border: none !important;
 }
 
-/* 超時延遲：柔和土褐底 + 棕褐字 */
+/* 超時延遲：柔和土褐底 + 棕字 (無邊框) */
 .est-badge-overdue {
-    background: #f8f4f0;
-    color: #8c6343;
-    border: 1px solid #ebdcd0;
+    background-color: #f7f1ee !important;
+    color: #7c5843 !important;
+    border: none !important;
 }
 
 .form-control {
@@ -544,7 +549,7 @@ body:not(.map-enabled) .map-btn-recenter {
     line-height: 1; 
 }
 
-.chart-bar.income { background: linear-gradient(to top, var(--success), #34d399); }
+.chart-bar.income { background: linear-gradient(to top, #238551, #34d399); }
 .chart-bar.tip { background: linear-gradient(to top, var(--primary), #fb7185); }
 .chart-bar.cost { background: linear-gradient(to top, #94a3b8, #cbd5e1); }
 
@@ -599,6 +604,7 @@ body:not(.map-enabled) .map-btn-recenter {
 .date-amount {
     font-weight: bold;
     font-size: 1.15rem;
+    color: #238551 !important; /* 深綠色數字 */
 }
 
 .date-arrow {
@@ -666,7 +672,7 @@ body:not(.map-enabled) .map-btn-recenter {
 }
 
 /* ==============================================================
-   對話框與彈窗 (Modals & Dialogs)
+   對話框與彈窗 (Modals & Dialogs - 徹底防止透底)
    ============================================================== */
 .modal-overlay {
     position: fixed;
@@ -715,15 +721,17 @@ body:not(.map-enabled) .map-btn-recenter {
 .cal-day.selected { background: var(--primary); color: var(--btn-text); font-weight: bold; }
 .cal-day.in-range { background: var(--border); color: var(--text-main); }
 
-/* 明細與查詢彈窗全螢幕模式 */
+/* 明細與查詢全螢幕層 (100% 實心純白底色，杜絕下層背景重疊透出) */
 #view-daily-detail, #view-search-result {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: var(--page-bg);
-    z-index: 2500;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    opacity: 1 !important;
+    z-index: 2500 !important;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     transform: translateX(100vw);
