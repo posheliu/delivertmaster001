@@ -11,12 +11,12 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
-// 導航專用精緻向量圖示 (SVG)
+// 導航專用精緻向量圖示 (SVG) - 收入已更新為金融卡樣式[cite: 8]
 const NAV_ICONS = [
     // 0: 首頁 (House)
     `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-    // 1: 收入 (Wallet)
-    `<svg viewBox="0 0 24 24"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M16 12h6v4h-6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z"/><circle cx="18" cy="14" r="1"/></svg>`,
+    // 1: 收入 (Card - 與截圖完全一致)[cite: 8]
+    `<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>`,
     // 2: 小費 (Hand with Coins)
     `<svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg>`,
     // 3: 成本 (Receipt)
@@ -76,6 +76,7 @@ function injectNewStyles() {
         body:not(.map-enabled) #costs-list { padding-bottom: 80px; }
         body:not(.map-enabled) .handle-bar-wrapper { display: none !important; }
         body:not(.map-enabled) .panel-header { cursor: default !important; }
+        
         body:not(.map-enabled) #btn-menu { display: none !important; }
         
         body.map-enabled #map {
@@ -106,6 +107,11 @@ function injectNewStyles() {
         .side-nav-item:active { background: var(--timer-bg); }
         .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; }
         .side-nav-item.active { background: var(--timer-bg); color: var(--primary); font-weight: bold; border-left: 4px solid var(--primary); }
+
+        /* 上線時段向上移兩行高度 */
+        #side-menu-shift-section {
+            margin-bottom: 50px !important;
+        }
 
         body.map-enabled.on-home-view .header {
             background: transparent !important;
@@ -1295,7 +1301,7 @@ function renderActiveTimers() {
     activeTimers.forEach((timer, idx) => {
         const titleStr = timer.storeName ? `${timer.storeName} #${timer.orderNumber}` : `訂單計時 #${idx + 1}`;
         
-        // Notion 風格同色系狀態標籤：即時判定是否超時
+        // Notion 風格同色系狀態標籤：即時判定是否超時[cite: 2]
         let estStr = '';
         if (timer.estimatedTime) {
             const isOverdue = (now - timer.startTime) > timer.estimatedTime * 60000;
