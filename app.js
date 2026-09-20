@@ -11,7 +11,7 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
-// 導航專用精緻向量圖示 (SVG) - 收入已替換為卡片樣式
+// 導航專用精緻向量圖示 (SVG) - 設定齒輪已修復為標準對稱外型
 const NAV_ICONS = [
     // 0: 首頁 (House)
     `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -23,8 +23,8 @@ const NAV_ICONS = [
     `<svg viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>`,
     // 4: 準時率 (Clock Check)
     `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/><path d="m16 9 2 2 4-4"/></svg>`,
-    // 5: 設定 (Gear)
-    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    // 5: 設定 (Gear - 標準對稱工業齒輪)
+    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
 ];
 
 // 瀏覽器返回鍵狀態控制
@@ -100,10 +100,9 @@ function injectNewStyles() {
         .side-menu-content { flex: 1; overflow-y: auto; padding: 10px 0; -webkit-overflow-scrolling: touch; }
         .side-nav-item { display: flex; align-items: center; padding: 15px 20px; color: var(--text-main); text-decoration: none; font-size: 1.05rem; cursor: pointer; transition: background 0.2s, color 0.2s; }
         .side-nav-item:active { background: var(--timer-bg); }
-        .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; }
+        .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
         .side-nav-item.active { background: var(--timer-bg); color: var(--primary); font-weight: bold; border-left: 4px solid var(--primary); }
 
-        /* 上線時段向上平移約兩行高度 */
         #side-menu-shift-section {
             margin-bottom: 50px !important;
         }
@@ -297,7 +296,7 @@ function generateShieldIcon() {
     ctx.fillStyle = '#ffffff';
     ctx.fill();
 
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.4;
     ctx.strokeStyle = '#1e293b';
     ctx.stroke();
 
@@ -316,16 +315,20 @@ function initMap() {
         attributionControl: false
     });
 
-    // 建立藍色定位方向標記
+    // 建立正圓藍色定位方向標記 (徹底修正拉伸變形)
     const markerEl = document.createElement('div');
-    markerEl.className = 'custom-blue-dot';
+    markerEl.className = 'custom-blue-dot-container';
+    markerEl.style.width = '18px';
+    markerEl.style.height = '18px';
+    markerEl.style.aspectRatio = '1 / 1';
+    markerEl.style.position = 'relative';
     markerEl.innerHTML = `
-        <div id="map-dir-marker" style="width: 18px; height: 18px; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
+        <div id="map-dir-marker" style="width: 18px; height: 18px; min-width: 18px; min-height: 18px; max-width: 18px; max-height: 18px; aspect-ratio: 1 / 1; box-sizing: border-box; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
             <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 220px; height: 100px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center; pointer-events: none;"></div>
         </div>
     `;
 
-    userMarker = new maplibregl.Marker({ element: markerEl })
+    userMarker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
         .setLngLat([currentLoc[1], currentLoc[0]])
         .addTo(mapInstance);
 
@@ -362,7 +365,7 @@ function initMap() {
             ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary']
         ];
 
-        // 1. 【外層軌道】Uber 風格三色動態路況 (綠/橙/紅細線)
+        // 1. 【外層軌道】適度加粗外線寬度，凸顯立體感
         mapInstance.addLayer({
             'id': 'uber-traffic-casing',
             'type': 'line',
@@ -382,16 +385,16 @@ function initMap() {
                 ],
                 'line-width': [
                     'interpolate', ['linear'], ['zoom'],
-                    11, 3.5,
-                    13, 6,
-                    14.5, 8.5,
-                    16, 13,
-                    18, 20
+                    11, 4.5,
+                    13, 7.5,
+                    14.5, 10.5,
+                    16, 15.5,
+                    18, 24
                 ]
             }
         }, firstSymbolId);
 
-        // 2. 【內層路心】純白填色，形成雙線細空心效果
+        // 2. 【內層路心】純白路心，保持約 2.0px~2.3px 的醒目外框厚度
         mapInstance.addLayer({
             'id': 'uber-traffic-inner',
             'type': 'line',
@@ -406,16 +409,16 @@ function initMap() {
                 'line-color': '#ffffff',
                 'line-width': [
                     'interpolate', ['linear'], ['zoom'],
-                    11, 1.8,
-                    13, 3.8,
-                    14.5, 5.8,
-                    16, 9.5,
-                    18, 15
+                    11, 2.0,
+                    13, 4.2,
+                    14.5, 6.5,
+                    16, 10.5,
+                    18, 16.5
                 ]
             }
         }, firstSymbolId);
 
-        // 3. 【縣鄉道盾牌標籤】(桃31, 桃121, 61, 15 等細黑框白底小方盒)
+        // 3. 【縣鄉道盾牌標籤】
         mapInstance.addLayer({
             'id': 'road-shield-labels',
             'type': 'symbol',
