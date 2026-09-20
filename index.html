@@ -37,7 +37,21 @@
         </div>
         <div style="width: 70px; text-align: right; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
             <span id="shift-status-badge-right" class="badge" style="display: none; background:var(--success); color:var(--btn-text); font-size:0.75rem; padding:2px 6px; font-weight:normal; border:1px solid var(--success); white-space: nowrap;">上線中</span>
-            <button class="btn-icon" id="btn-search" onclick="openFilterModal()" style="display:none; margin: 0; padding: 4px; font-size: 1.2rem;">📅</button>
+            <!-- 頂部查照按鈕：向量日曆圖示 -->
+            <button class="btn-icon" id="btn-search" onclick="openFilterModal()" style="display:none; margin: 0; padding: 4px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="3"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/>
+                    <line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                    <circle cx="8" cy="14" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="14" r="1" fill="currentColor"/>
+                    <circle cx="16" cy="14" r="1" fill="currentColor"/>
+                    <circle cx="8" cy="18" r="1" fill="currentColor"/>
+                    <circle cx="12" cy="18" r="1" fill="currentColor"/>
+                    <circle cx="16" cy="18" r="1" fill="currentColor"/>
+                </svg>
+            </button>
         </div>
     </div>
 
@@ -47,15 +61,15 @@
             <div id="map"></div>
             
             <div id="bottom-panel" class="bottom-panel">
-                <!-- 回到定位按鈕：精準 GPS 準星向量圖示 -->
+                <!-- 回到定位按鈕：雙層同心圓環 + 四向外凸刻度 -->
                 <button id="btn-recenter" class="map-btn-recenter" onclick="recenterMap()" title="回到定位">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="8"/>
-                        <line x1="12" y1="2" x2="12" y2="6"/>
-                        <line x1="12" y1="18" x2="12" y2="22"/>
-                        <line x1="2" y1="12" x2="6" y2="12"/>
-                        <line x1="18" y1="12" x2="22" y2="12"/>
-                        <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#18181b" stroke-width="2.3" stroke-linecap="round">
+                        <circle cx="12" cy="12" r="6.5"/>
+                        <circle cx="12" cy="12" r="2.5"/>
+                        <line x1="12" y1="1.5" x2="12" y2="4.5"/>
+                        <line x1="12" y1="19.5" x2="12" y2="22.5"/>
+                        <line x1="1.5" y1="12" x2="4.5" y2="12"/>
+                        <line x1="19.5" y1="12" x2="22.5" y2="12"/>
                     </svg>
                 </button>
                 
@@ -388,7 +402,7 @@
         </div>
     </div>
 
-    <!-- 底部導航 (修正設定圖示) -->
+    <!-- 底部導航 -->
     <div class="bottom-nav">
         <a class="nav-item active" id="nav-0" onclick="switchView(0)">
             <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
@@ -421,7 +435,7 @@
         </a>
     </div>
 
-    <!-- 側邊攔選單 (修正設定圖示) -->
+    <!-- 側邊攔選單 -->
     <div class="side-menu-overlay" id="side-menu-overlay" onclick="toggleSideMenu()"></div>
     <div class="side-menu" id="side-menu">
         <div class="side-menu-header">
