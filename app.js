@@ -11,7 +11,7 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
-// 導航專用精緻向量圖示 (SVG) - 設定齒輪對稱修復
+// 導航專用精緻向量圖示 (SVG) - 設定齒輪已修復為標準對稱外型
 const NAV_ICONS = [
     // 0: 首頁 (House)
     `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
@@ -60,7 +60,7 @@ function formatMins(mins) { const h = Math.floor(mins / 60), m = Math.floor(mins
 function fmtMoney(num) { return '$' + Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } 
 function fmtNum(num) { return Number(num).toLocaleString('en-US'); }
 
-/* ================== 動態注入樣式修補 ================== */
+/* ================== 動態注入新功能 CSS ================== */
 function injectNewStyles() {
     if (document.getElementById('injected-new-styles')) return;
     const style = document.createElement('style');
@@ -148,39 +148,6 @@ function injectNewStyles() {
 
         .detail-tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; color: var(--text-muted); font-weight: bold; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: 0.2s; }
         .detail-tab.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
-
-        /* 徹底防止彈窗背景透明透出下層內容 */
-        #view-daily-detail, #view-search-result {
-            background-color: #ffffff !important;
-            background: #ffffff !important;
-            opacity: 1 !important;
-            z-index: 2500 !important;
-        }
-
-        /* 預估時間標籤：去除邊框、還原 Notion 溫潤軟色調 */
-        .est-badge {
-            display: inline-flex !important;
-            align-items: center !important;
-            font-size: 0.75rem !important;
-            font-weight: 500 !important;
-            padding: 2px 8px !important;
-            border-radius: 6px !important;
-            margin-left: 6px !important;
-            border: none !important;
-            outline: none !important;
-            box-shadow: none !important;
-            line-height: 1.3 !important;
-        }
-        .est-badge-ontime {
-            background-color: #edf6ee !important;
-            color: #2e7d32 !important;
-            border: none !important;
-        }
-        .est-badge-overdue {
-            background-color: #f7f1ee !important;
-            color: #7c5843 !important;
-            border: none !important;
-        }
     `;
     document.head.appendChild(style);
 }
@@ -348,7 +315,7 @@ function initMap() {
         attributionControl: false
     });
 
-    // 建立正圓藍色定位方向標記 (aspect-ratio: 1/1 鎖定正圓)
+    // 建立正圓藍色定位方向標記 (徹底修正拉伸變形)
     const markerEl = document.createElement('div');
     markerEl.className = 'custom-blue-dot-container';
     markerEl.style.width = '18px';
@@ -381,20 +348,10 @@ function initMap() {
             }
         }
 
-        // 1. 還原繁體中文地名、路名與建築地標
+        // 淨化小巷與水域
         layers.forEach(layer => {
-            if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-                mapInstance.setLayoutProperty(layer.id, 'text-field', [
-                    'coalesce',
-                    ['get', 'name:zh-Hant'],
-                    ['get', 'name:zh_hant'],
-                    ['get', 'name:zh'],
-                    ['get', 'name']
-                ]);
-            }
-            // 普通住宅道路與農路以乾淨清晰淺灰色保留 (不抹白)
             if (layer.id.includes('road') && layer.type === 'line') {
-                mapInstance.setPaintProperty(layer.id, 'line-color', '#dcdfe4');
+                mapInstance.setPaintProperty(layer.id, 'line-color', '#f1f5f9');
             }
             if (layer.id.includes('water') && layer.type === 'fill') {
                 mapInstance.setPaintProperty(layer.id, 'fill-color', '#e2f1fd');
@@ -403,14 +360,12 @@ function initMap() {
 
         const roadSource = 'carto';
         const roadSourceLayer = 'transportation';
-        
-        // 納入 tertiary 確保桃30, 桃31, 潮音一路等關鍵聯絡道全部浮現
         const majorRoadFilter = [
             'all',
-            ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary']
+            ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary']
         ];
 
-        // 2. 【外層軌道】加粗醒目外框 (綠/橙/紅)
+        // 1. 【外層軌道】適度加粗外線寬度，凸顯立體感
         mapInstance.addLayer({
             'id': 'uber-traffic-casing',
             'type': 'line',
@@ -439,7 +394,7 @@ function initMap() {
             }
         }, firstSymbolId);
 
-        // 3. 【內層路心】純白填色，維持雙線空心視覺
+        // 2. 【內層路心】純白路心，保持約 2.0px~2.3px 的醒目外框厚度
         mapInstance.addLayer({
             'id': 'uber-traffic-inner',
             'type': 'line',
@@ -463,7 +418,7 @@ function initMap() {
             }
         }, firstSymbolId);
 
-        // 4. 【縣鄉道盾牌標籤】
+        // 3. 【縣鄉道盾牌標籤】
         mapInstance.addLayer({
             'id': 'road-shield-labels',
             'type': 'symbol',
@@ -812,7 +767,7 @@ function confirmOrderNumber() {
     if (val !== '') { closeModal('order-number-modal'); if (pendingOrderAction) { pendingOrderAction(val); pendingOrderAction = null; } }
 }
 
-/* ================== 每週油耗與長條圖 (真實像素高低差運算) ================== */
+/* ================== 每週油耗與圖表 (修正高低動態比例) ================== */
 function calculateWeeklyFuel(startTs, endTs) {
     const allFuel = costRecords.filter(r => r.type === '加油' && r.mileage && Number(r.mileage) > 0).sort((a,b) => a.timestamp - b.timestamp);
     const weeklyFuel = allFuel.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
@@ -829,35 +784,25 @@ function nextWeek() { const sInput = document.getElementById('cost-search-input'
 function getWeekNumber(d) { const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7)); return Math.ceil(( ( (date - new Date(Date.UTC(date.getUTCFullYear(),0,1))) / 86400000) + 1)/7); }
 
 function renderWeeklyChart(containerId, records, type) {
-    const container = document.getElementById(containerId); 
-    if (!container) return;
-
-    let dailyTotals = [0, 0, 0, 0, 0, 0, 0];
-    const dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
-    
-    records.forEach(r => { 
-        let dayIdx = new Date(r.timestamp).getDay() - 1; 
-        if (dayIdx === -1) dayIdx = 6; 
-        dailyTotals[dayIdx] += r.amount; 
-    });
-
+    const container = document.getElementById(containerId); if (!container) return;
+    let dailyTotals = [0, 0, 0, 0, 0, 0, 0], dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
+    records.forEach(r => { let dayIdx = new Date(r.timestamp).getDay() - 1; if (dayIdx === -1) dayIdx = 6; dailyTotals[dayIdx] += r.amount; });
     const maxAmt = Math.max(...dailyTotals, 1); 
-    const MAX_BAR_HEIGHT = 58; 
     let html = '';
-
-    for (let i = 0; i < 7; i++) {
-        let barHeight = 2; 
+    for (let i = 0; i < 7; i++) { 
+        let heightPct = 0;
         if (dailyTotals[i] > 0) {
-            barHeight = Math.max(Math.round((dailyTotals[i] / maxAmt) * MAX_BAR_HEIGHT), 6);
+            heightPct = Math.round((dailyTotals[i] / maxAmt) * 100);
+            if (heightPct < 5) heightPct = 5; // 確保極小數值依然有基礎辨識度
         }
-
         html += `
             <div class="chart-bar-wrap">
-                <div class="chart-val">${dailyTotals[i] > 0 ? fmtNum(Math.round(dailyTotals[i])) : ''}</div>
-                <div class="chart-bar ${type}" style="height: ${barHeight}px;"></div>
+                <div class="chart-val">${dailyTotals[i] > 0 ? fmtNum(dailyTotals[i]) : ''}</div>
+                <div class="chart-bar-track">
+                    <div class="chart-bar ${type}" style="height: ${heightPct}%;"></div>
+                </div>
                 <div class="chart-label">${dayLabels[i]}</div>
-            </div>
-        `;
+            </div>`; 
     }
     container.innerHTML = html;
 }
@@ -883,12 +828,7 @@ function renderWeeklyData() {
     const startTs = viewedWeekStart.getTime(), endTs = end.getTime();
     
     const weeklyRecords = historyRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
-    
-    // 收入總額恢復為深綠色
-    const totalIncomeEl = document.getElementById('weekly-total-amount');
-    totalIncomeEl.innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0));
-    totalIncomeEl.style.color = '#238551';
-
+    document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0));
     document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(shiftRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs).reduce((s, r) => s + r.durationMins, 0))}`;
     
     const normalWeeklyRecords = weeklyRecords.filter(r => !r.isCancelled);
@@ -896,10 +836,7 @@ function renderWeeklyData() {
     renderWeeklyChart('weekly-chart-income', normalWeeklyRecords, 'income');
 
     const weeklyTips = tipRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
-    const totalTipsEl = document.getElementById('weekly-total-amount-tips');
-    totalTipsEl.innerText = fmtMoney(weeklyTips.reduce((sum, r) => sum + r.amount, 0));
-    totalTipsEl.style.color = '#238551';
-
+    document.getElementById('weekly-total-amount-tips').innerText = fmtMoney(weeklyTips.reduce((sum, r) => sum + r.amount, 0));
     renderTips(weeklyTips, 'tips-list'); renderWeeklyChart('weekly-chart-tips', weeklyTips, 'tip');
 
     const weeklyCosts = costRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
@@ -1110,9 +1047,9 @@ function updateUIState() {
             shiftBadge.style.display = 'none';
             if(shiftBadgeRight) shiftBadgeRight.style.display = 'none';
         }
-        btnSearch.style.display = viewHasSearch[currentViewIndex] ? 'flex' : 'none'; 
+        btnSearch.style.display = viewHasSearch[currentViewIndex] ? 'block' : 'none'; 
         btnBack.style.display = 'none'; 
-        if(btnMenu) btnMenu.style.display = 'flex';
+        if(btnMenu) btnMenu.style.display = 'block';
     } 
 }
 
@@ -1526,8 +1463,7 @@ function toggleMileageInput() { const type = document.getElementById('cost-type'
 
 /* ================== 共用群組渲染函數 ================== */
 function groupDataByDate(records) { const grouped = {}; records.forEach(rec => { if (!grouped[rec.dateKey]) grouped[rec.dateKey] = { dateKey: rec.dateKey, title: `${rec.year}年${rec.month}月${rec.day}日`, totalAmount: 0, records: [] }; grouped[rec.dateKey].records.push(rec); grouped[rec.dateKey].totalAmount += rec.amount; }); return grouped; }
-
-function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amountPrefix = '', amountColor = '#238551') {
+function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amountPrefix = '', amountColor = 'var(--success)') {
     const container = document.getElementById(containerId);
     if (data.length === 0) return container.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
     let html = '';
@@ -1536,10 +1472,10 @@ function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amou
     });
     container.innerHTML = html;
 }
-function renderTips(data = tipRecords, containerId = 'tips-list') { renderRecordGroup(data, containerId, '此區間尚無小費紀錄', 'tip', '筆小費', '', '#238551'); }
+function renderTips(data = tipRecords, containerId = 'tips-list') { renderRecordGroup(data, containerId, '此區間尚無小費紀錄', 'tip', '筆小費'); }
 function renderCosts(data = costRecords, containerId = 'costs-list') { renderRecordGroup(data, containerId, '此區間尚無成本紀錄', 'cost', '筆成本', '支出 ', 'var(--text-main)'); }
 function renderStats(data = historyRecords, containerId = 'stats-list') { 
-    renderRecordGroup(data.filter(r => !r.isCancelled), containerId, '此區間尚無收入紀錄', 'income', '張訂單', '', '#238551'); 
+    renderRecordGroup(data.filter(r => !r.isCancelled), containerId, '此區間尚無收入紀錄', 'income', '張訂單'); 
 }
 
 /* ================== 單日明細 Modal 邏輯 ================== */
@@ -1581,9 +1517,8 @@ function renderDailyDetail() {
     if (currentDailyContext === 'income') {
         document.getElementById('daily-detail-type-label').innerText = '報酬 (當日總額)';
         const dailyRecords = historyRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
-        const amtEl = document.getElementById('daily-detail-amount');
-        amtEl.innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
-        amtEl.style.color = '#238551';
+        document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
+        document.getElementById('daily-detail-amount').style.color = 'var(--success)';
         
         let totalShiftMins = shiftRecords.filter(r => r.dateKey === dateKey).reduce((s,r) => s + r.durationMins, 0) + (activeShift && getDateKey(activeShift.startTime) === dateKey ? Math.floor((Date.now() - activeShift.startTime) / 60000) : 0);
         const dailyWaits = waitRecords.filter(r => r.dateKey === dateKey);
@@ -1599,17 +1534,15 @@ function renderDailyDetail() {
     } else if (currentDailyContext === 'tip') {
         document.getElementById('daily-detail-type-label').innerText = '小費總額';
         const dailyRecords = tipRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
-        const amtEl = document.getElementById('daily-detail-amount');
-        amtEl.innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
-        amtEl.style.color = '#238551';
+        document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
+        document.getElementById('daily-detail-amount').style.color = 'var(--success)';
         statsGrid.style.display = 'none';
         tabsContainer.style.display = 'none';
     } else if (currentDailyContext === 'cost') {
         document.getElementById('daily-detail-type-label').innerText = '成本支出總額';
         const dailyRecords = costRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
-        const amtEl = document.getElementById('daily-detail-amount');
-        amtEl.innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
-        amtEl.style.color = 'var(--text-main)';
+        document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
+        document.getElementById('daily-detail-amount').style.color = 'var(--text-main)';
         statsGrid.style.display = 'none';
         tabsContainer.style.display = 'none';
     }
@@ -1637,13 +1570,13 @@ function renderDailyDetailList() {
         } else {
             targetList.forEach(r => {
                 const titleStr = r.storeName ? `<div style="font-weight:bold; color:var(--primary); margin-bottom:4px; font-size:1rem; word-break:break-word;">${r.storeName} #${r.orderNumber}</div>` : '';
-                html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer; color:#238551;">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
+                html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
             });
         }
     } else if (currentDailyContext === 'tip') {
         const dailyRecords = tipRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
         if (dailyRecords.length === 0) html = '<div class="empty-state">今日無小費紀錄</div>';
-        else dailyRecords.forEach(r => html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('tip', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr}</div><div class="record-desc">支付方式: ${r.method}</div></div><div class="record-amount" style="color:#238551;">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteTip('${r.id}')">刪除</div></div></div>`);
+        else dailyRecords.forEach(r => html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('tip', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr}</div><div class="record-desc">支付方式: ${r.method}</div></div><div class="record-amount">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteTip('${r.id}')">刪除</div></div></div>`);
     } else if (currentDailyContext === 'cost') {
         const dailyRecords = costRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
         if (dailyRecords.length === 0) html = '<div class="empty-state">今日無成本紀錄</div>';
@@ -1691,15 +1624,8 @@ async function applyFilter() {
     const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime && !r.isCancelled), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
     
     document.getElementById('search-total-orders').innerText = fInc.length + '張'; 
-    
-    const sIncEl = document.getElementById('search-total-income');
-    sIncEl.innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); 
-    sIncEl.style.color = '#238551';
-
-    const sTipEl = document.getElementById('search-total-tips');
-    sTipEl.innerText = fmtMoney(fTip.reduce((s, r)=>s+r.amount,0)); 
-    sTipEl.style.color = '#238551';
-
+    document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); 
+    document.getElementById('search-total-tips').innerText = fmtMoney(fTip.reduce((s, r)=>s+r.amount,0)); 
     document.getElementById('search-total-costs').innerText = '-' + fmtMoney(fCost.reduce((s, r)=>s+r.amount,0)); 
     const sd = new Date(sTime), ed = new Date(eTime), sStr = `${sd.getFullYear()}/${sd.getMonth()+1}/${sd.getDate()}`, eStr = `${ed.getFullYear()}/${ed.getMonth()+1}/${ed.getDate()}`; 
     document.getElementById('search-date-range').innerText = sStr === eStr ? sStr : `${sStr} ~ ${eStr}`; 
@@ -1779,16 +1705,10 @@ function calculatePunctuality() {
         document.getElementById('punctuality-total-timeout').innerText = '--%';
         document.getElementById('punctuality-diff-amount').innerText = '$0.00';
     } else {
-        const onTimeEl = document.getElementById('punctuality-ontime');
-        onTimeEl.innerText = currentStats.onTimeRate.toFixed(1) + '%';
-        onTimeEl.style.color = '#238551';
-
+        document.getElementById('punctuality-ontime').innerText = currentStats.onTimeRate.toFixed(1) + '%';
         document.getElementById('punctuality-avg-timeout').innerText = currentStats.avgTimeoutRate.toFixed(1) + '%';
         document.getElementById('punctuality-total-timeout').innerText = currentStats.totalTimeoutRate.toFixed(1) + '%';
-        
-        const diffAmtEl = document.getElementById('punctuality-diff-amount');
-        diffAmtEl.innerText = fmtMoney(currentStats.diffAmount);
-        diffAmtEl.style.color = '#238551';
+        document.getElementById('punctuality-diff-amount').innerText = fmtMoney(currentStats.diffAmount);
     }
 
     // 計算前一期
@@ -1804,18 +1724,12 @@ function calculatePunctuality() {
         document.getElementById('prev-punctuality-total-timeout').innerText = '--%';
         document.getElementById('prev-punctuality-diff-amount').innerText = '$0.00';
     } else {
-        const prevOnTimeEl = document.getElementById('prev-punctuality-ontime');
-        prevOnTimeEl.innerText = prevStats.onTimeRate.toFixed(1) + '%';
-        prevOnTimeEl.style.color = '#238551';
-
+        document.getElementById('prev-punctuality-ontime').innerText = prevStats.onTimeRate.toFixed(1) + '%';
         document.getElementById('prev-punctuality-avg-timeout').innerText = prevStats.avgTimeoutRate.toFixed(1) + '%';
         document.getElementById('prev-punctuality-total-timeout').innerText = prevStats.totalTimeoutRate.toFixed(1) + '%';
-        
-        const prevDiffAmtEl = document.getElementById('prev-punctuality-diff-amount');
-        prevDiffAmtEl.innerText = fmtMoney(prevStats.diffAmount);
-        prevDiffAmtEl.style.color = '#238551';
+        document.getElementById('prev-punctuality-diff-amount').innerText = fmtMoney(prevStats.diffAmount);
     }
 }
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
-function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || k.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
+function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || key.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
