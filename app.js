@@ -11,11 +11,11 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
-// 導航專用精緻向量圖示 (SVG) - 收入已更新為金融卡樣式[cite: 8]
+// 導航專用精緻向量圖示 (SVG) - 收入已替換為卡片樣式
 const NAV_ICONS = [
     // 0: 首頁 (House)
     `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-    // 1: 收入 (Card - 與截圖完全一致)[cite: 8]
+    // 1: 收入 (Card)
     `<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>`,
     // 2: 小費 (Hand with Coins)
     `<svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg>`,
@@ -49,12 +49,12 @@ function pushHistory() {
 let mapInstance = null;
 let currentTileLayer = null;
 let userMarker = null;
-let currentLoc = [25.0478, 121.5170]; // 預設改為台北車站
+let currentLoc = [25.0478, 121.5170]; // 預設台北車站
 let geoWatchId = null;
 let hasCenteredMapInit = false; 
 
-// 極簡明亮地圖 (淺灰陸地、淺藍水域、少量 POI)
-const MAP_TILE = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+// 免 API Key 開源圖資 (解決浮水印問題，清晰且繁體地名完整)
+const MAP_TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /* ================== 日期與時間工具 ================== */
 function getDateKey(ts) { const d = new Date(ts); return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`; }
@@ -108,7 +108,7 @@ function injectNewStyles() {
         .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; }
         .side-nav-item.active { background: var(--timer-bg); color: var(--primary); font-weight: bold; border-left: 4px solid var(--primary); }
 
-        /* 上線時段向上移兩行高度 */
+        /* 上線時段向上平移約兩行高度 */
         #side-menu-shift-section {
             margin-bottom: 50px !important;
         }
@@ -1301,7 +1301,7 @@ function renderActiveTimers() {
     activeTimers.forEach((timer, idx) => {
         const titleStr = timer.storeName ? `${timer.storeName} #${timer.orderNumber}` : `訂單計時 #${idx + 1}`;
         
-        // Notion 風格同色系狀態標籤：即時判定是否超時[cite: 2]
+        // Notion 低飽和同色系標籤：即時判定超時狀態
         let estStr = '';
         if (timer.estimatedTime) {
             const isOverdue = (now - timer.startTime) > timer.estimatedTime * 60000;
@@ -1322,7 +1322,7 @@ function updateTimersDisplay() {
         const el = document.getElementById(`duration_${timer.id}`); 
         if (el) el.innerText = formatDuration(now - timer.startTime); 
         
-        // 每秒即時動態比對計時器與預估時間，超時自動切換為土色，範圍內保持綠色
+        // 動態比對時間：未超時保持綠色，超時自動轉為土色
         if (timer.estimatedTime) {
             const estEl = document.getElementById(`est_badge_${timer.id}`);
             if (estEl) {
