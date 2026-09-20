@@ -3,7 +3,7 @@
    ============================================================== */
 :root {
     --primary: #ff7597; --primary-hover: #ff4d79; --btn-text: #ffffff;
-    --success: #059669; /* 加深的綠色 */
+    --success: #059669;
     --danger: #ef4444; --danger-text: #ffffff;   
     --page-bg: #fff0f5; --bg: #fff0f5; --card-bg: #ffffff;       
     --timer-bg: #f8fafc; --text-main: #3f3f46; --text-muted: #a1a1aa;
@@ -210,7 +210,7 @@ body.night-mode .active-timer-container.dragging {
 .btn-stop:active { transform: translateY(2px) scale(0.95); box-shadow: 0 1px 2px rgba(0,0,0,0.1), inset 0 2px 4px rgba(0,0,0,0.15); }
 
 /* ==============================================================
-   🌟 新增：Notion 低飽和同色系狀態標籤 (Tone-on-Tone)
+   Notion 低飽和同色系狀態標籤 (Tone-on-Tone)
    ============================================================== */
 .est-badge {
     display: inline-flex;
@@ -273,7 +273,7 @@ body.night-mode .est-badge-overdue {
 .btn-edit:hover { transform: scale(1.1); }
 
 /* ==============================================================
-   🌟 導航列與向量圖示 (SVG) 樣式增強
+   導航列與向量圖示 (SVG) 樣式
    ============================================================== */
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--nav-bg); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(10px + env(safe-area-inset-bottom)); box-shadow: 0 -5px 25px rgba(0,0,0,0.08); z-index: 1000; max-width: 600px; margin: 0 auto; backdrop-filter: var(--card-backdrop); -webkit-backdrop-filter: var(--card-backdrop); transition: background 0.4s; }
 .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem; text-decoration: none; cursor: pointer; flex: 1; transition: 0.2s;}
@@ -370,7 +370,7 @@ body.night-mode .est-badge-overdue {
 .summary-item strong { display: block; font-size: 1.15rem; margin-top: 4px; text-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
 /* ==============================================================
-   地圖與底部拖曳面板樣式
+   MapLibre GL 向量地圖與底部拖曳面板樣式
    ============================================================== */
 .map-view-override {
     padding: 0 !important;
@@ -382,17 +382,59 @@ body:not(.map-enabled) #view-home.map-view-override {
     overflow-y: auto !important;
 }
 
+/* MapLibre 容器與滿版展示 */
 #map {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100% !important;
+    height: 100% !important;
     z-index: 1;
     display: none;
+    background-color: #ffffff;
 }
+
+#map .maplibregl-canvas {
+    outline: none !important;
+}
+
 body.map-enabled #map {
-    display: block;
+    display: block !important;
+}
+
+/* 隱藏 MapLibre 預設浮水印/版權縮小列以維持乾淨導航視覺 */
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+    display: none !important;
+}
+
+/* 🎯 GPS 藍色定位光錐標記 */
+.custom-blue-dot {
+    width: 18px;
+    height: 18px;
+    background-color: #007aff;
+    border: 2.5px solid white;
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.custom-blue-dot-cone {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 220px;
+    height: 100px;
+    background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%);
+    clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+    transform-origin: bottom center;
+    pointer-events: none;
 }
 
 /* 底部面板本體 */
@@ -500,7 +542,3 @@ body:not(.map-enabled) .panel-content {
 body:not(.map-enabled) .map-btn-recenter {
     display: none;
 }
-
-/* 確保 Leaflet 控制項不會蓋到 Header */
-.leaflet-top, .leaflet-bottom { z-index: 9 !important; }
-.leaflet-control-container .leaflet-top { top: 70px; }
