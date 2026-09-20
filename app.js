@@ -11,11 +11,11 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
-// 導航專用精緻向量圖示 (SVG) - 收入已替換為卡片樣式
+// 導航專用精緻向量圖示 (SVG) - 收入採用卡片樣式[cite: 8]
 const NAV_ICONS = [
     // 0: 首頁 (House)
     `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-    // 1: 收入 (Card)
+    // 1: 收入 (Card)[cite: 8]
     `<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>`,
     // 2: 小費 (Hand with Coins)
     `<svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg>`,
@@ -45,16 +45,15 @@ function pushHistory() {
     if (!isPopStateAction) history.pushState({}, '');
 }
 
-// Leaflet 地圖變數
+// MapLibre GL 向量地圖變數 [經度, 緯度]
 let mapInstance = null;
-let currentTileLayer = null;
 let userMarker = null;
-let currentLoc = [25.0478, 121.5170]; // 預設台北車站
+let currentLoc = [121.1970, 25.0620]; // 預設桃園大園區
 let geoWatchId = null;
 let hasCenteredMapInit = false; 
 
-// 免 API Key 開源圖資 (解決浮水印問題，清晰且繁體地名完整)
-const MAP_TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+// 免 API Key 向量圖資樣式
+const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 /* ================== 日期與時間工具 ================== */
 function getDateKey(ts) { const d = new Date(ts); return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`; }
@@ -108,7 +107,6 @@ function injectNewStyles() {
         .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; }
         .side-nav-item.active { background: var(--timer-bg); color: var(--primary); font-weight: bold; border-left: 4px solid var(--primary); }
 
-        /* 上線時段向上平移約兩行高度 */
         #side-menu-shift-section {
             margin-bottom: 50px !important;
         }
@@ -275,38 +273,43 @@ window.onload = function() {
     switchView(0, true);
 };
 
-/* ================== 地圖、即時路況與面板邏輯 ================== */
-let trafficLayer = null;
-let isFetchingTraffic = false;
-
+/* ================== MapLibre GL 向量地圖與空心路網渲染邏輯 ================== */
 function initMap() {
-    if (typeof L === 'undefined') { console.warn('無法載入地圖資源'); return; }
+    if (typeof maplibregl === 'undefined') { console.warn('無法載入 MapLibre GL 資源'); return; }
     if (mapInstance) return;
     
-    mapInstance = L.map('map', {zoomControl: false}).setView(currentLoc, 15);
-    currentTileLayer = L.tileLayer(MAP_TILE, { maxZoom: 19 }).addTo(mapInstance);
-    
-    trafficLayer = L.layerGroup().addTo(mapInstance);
-    
-    const blueDotIcon = L.divIcon({
-        className: 'custom-blue-dot',
-        html: `<div id="map-dir-marker" style="width: 18px; height: 18px; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
-                  <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 220px; height: 100px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center;"></div>
-               </div>`,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9]
+    mapInstance = new maplibregl.Map({
+        container: 'map',
+        style: MAP_STYLE_URL,
+        center: currentLoc,
+        zoom: 14,
+        pitch: 0,
+        attributionControl: false
     });
-    userMarker = L.marker(currentLoc, {icon: blueDotIcon}).addTo(mapInstance);
+
+    // 向量地圖載入後，套用空心路網與清爽色調
+    mapInstance.on('load', () => {
+        setupHollowRoads();
+    });
+
+    // 建立藍色光錐定位標記
+    const markerEl = document.createElement('div');
+    markerEl.className = 'custom-blue-dot';
+    markerEl.innerHTML = `<div class="custom-blue-dot-cone" id="map-dir-marker"></div>`;
+
+    userMarker = new maplibregl.Marker({ element: markerEl })
+        .setLngLat(currentLoc)
+        .addTo(mapInstance);
         
     if ("geolocation" in navigator) {
         geoWatchId = navigator.geolocation.watchPosition(
             (position) => {
-                currentLoc = [position.coords.latitude, position.coords.longitude];
+                currentLoc = [position.coords.longitude, position.coords.latitude];
                 if (userMarker) {
-                    userMarker.setLatLng(currentLoc);
+                    userMarker.setLngLat(currentLoc);
                     if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
                         const markerDiv = document.getElementById('map-dir-marker');
-                        if (markerDiv) markerDiv.style.transform = `rotate(${position.coords.heading}deg)`;
+                        if (markerDiv) markerDiv.style.transform = `translateX(-50%) rotate(${position.coords.heading}deg)`;
                     }
                 }
                 if (!hasCenteredMapInit) {
@@ -322,81 +325,93 @@ function initMap() {
         );
     }
 
-    mapInstance.on('moveend', () => {
-        clearTimeout(window.trafficTimer);
-        window.trafficTimer = setTimeout(loadFakeTraffic, 800);
-    });
-    setTimeout(loadFakeTraffic, 1000);
-    setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 500);
+    setTimeout(() => { if (mapInstance) mapInstance.resize(); }, 500);
 }
 
-function loadFakeTraffic() {
-    if (!document.body.classList.contains('map-enabled') || !mapInstance) return;
-    if (mapInstance.getZoom() < 13) {
-        trafficLayer.clearLayers();
-        return;
-    }
-    if (isFetchingTraffic) return;
-    isFetchingTraffic = true;
-    
-    const bounds = mapInstance.getBounds();
-    const s = bounds.getSouth() - 0.01;
-    const n = bounds.getNorth() + 0.01;
-    const w = bounds.getWest() - 0.01;
-    const e = bounds.getEast() + 0.01;
-    
-    const query = `[out:json][timeout:5];(way["highway"~"primary|secondary"](${s},${w},${n},${e}););out geom;`;
-    
-    fetch('https://overpass-api.de/api/interpreter', {
-        method: 'POST',
-        body: query
-    }).then(res => res.json()).then(data => {
-        trafficLayer.clearLayers();
-        data.elements.forEach(el => {
-            if (el.type === 'way' && el.geometry) {
-                const latlngs = el.geometry.map(g => [g.lat, g.lon]);
-                const rand = Math.random();
-                let color = '#22c55e'; 
-                if (rand > 0.8) color = '#eab308'; 
-                if (rand > 0.95) color = '#ef4444'; 
-                
-                L.polyline(latlngs, {
-                    color: color,
-                    weight: 6,
-                    opacity: 0.9,
-                    lineCap: 'round',
-                    lineJoin: 'round',
-                    className: 'fake-traffic-line-bg'
-                }).addTo(trafficLayer);
+// 建立 Uber 風格鮮綠色空心路網 (Casing + Inner)[cite: 10]
+function setupHollowRoads() {
+    if (!mapInstance || !mapInstance.getStyle()) return;
+    const layers = mapInstance.getStyle().layers;
 
-                L.polyline(latlngs, {
-                    color: '#ffffff', 
-                    weight: 2,
-                    opacity: 1,
-                    lineCap: 'round',
-                    lineJoin: 'round',
-                    className: 'fake-traffic-line-fg'
-                }).addTo(trafficLayer);
-            }
-        });
-        isFetchingTraffic = false;
-    }).catch(() => {
-        isFetchingTraffic = false; 
+    // 找到第一個文字/標誌圖層，確保空心路網位於文字下方
+    let firstSymbolId;
+    for (const layer of layers) {
+        if (layer.type === 'symbol') {
+            firstSymbolId = layer.id;
+            break;
+        }
+    }
+
+    // 弱化底圖雜亂小巷，調亮水體為淡藍色
+    layers.forEach(layer => {
+        if (layer.id.includes('road') && layer.type === 'line') {
+            mapInstance.setPaintProperty(layer.id, 'line-color', '#f1f5f9');
+        }
+        if (layer.id.includes('water') && layer.type === 'fill') {
+            mapInstance.setPaintProperty(layer.id, 'fill-color', '#e0f2fe');
+        }
     });
+
+    const roadSource = 'carto';
+    const roadSourceLayer = 'transportation';
+    const majorRoadFilter = [
+        'all',
+        ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary']
+    ];
+
+    // 外軌：鮮綠色邊線 (Casing)
+    if (!mapInstance.getLayer('custom-road-casing')) {
+        mapInstance.addLayer({
+            'id': 'custom-road-casing',
+            'type': 'line',
+            'source': roadSource,
+            'source-layer': roadSourceLayer,
+            'filter': majorRoadFilter,
+            'layout': { 'line-cap': 'round', 'line-join': 'round' },
+            'paint': {
+                'line-color': '#22c55e',
+                'line-width': [
+                    'interpolate', ['linear'], ['zoom'],
+                    12, 4.5,
+                    14, 7,
+                    16, 12,
+                    18, 20
+                ]
+            }
+        }, firstSymbolId);
+    }
+
+    // 內軌：純白路心 (Inner)，呈現空心線條質感 (══╦═══╝)
+    if (!mapInstance.getLayer('custom-road-inner')) {
+        mapInstance.addLayer({
+            'id': 'custom-road-inner',
+            'type': 'line',
+            'source': roadSource,
+            'source-layer': roadSourceLayer,
+            'filter': majorRoadFilter,
+            'layout': { 'line-cap': 'round', 'line-join': 'round' },
+            'paint': {
+                'line-color': '#ffffff',
+                'line-width': [
+                    'interpolate', ['linear'], ['zoom'],
+                    12, 2.5,
+                    14, 4.5,
+                    16, 8.5,
+                    18, 15
+                ]
+            }
+        }, firstSymbolId);
+    }
 }
 
 function recenterMap(instant = false) {
     if (mapInstance && currentLoc) {
-        const zoom = mapInstance.getZoom() || 15;
-        const targetPoint = mapInstance.project(currentLoc, zoom);
-        targetPoint.y += (window.innerHeight / 4); 
-        const targetLatLng = mapInstance.unproject(targetPoint, zoom);
-        
-        if (instant) {
-            mapInstance.setView(targetLatLng, zoom, { animate: false });
-        } else {
-            mapInstance.setView(targetLatLng, zoom, { animate: true, duration: 0.25 });
-        }
+        mapInstance.easeTo({
+            center: currentLoc,
+            zoom: Math.max(mapInstance.getZoom(), 14.5),
+            offset: [0, -window.innerHeight * 0.15],
+            duration: instant ? 0 : 350
+        });
     }
 }
 
@@ -547,7 +562,7 @@ function initBottomPanel() {
         const contentEl = document.getElementById('panel-scroll-content');
         if (contentEl) contentEl.style.paddingBottom = `${closest + 40}px`;
         
-        if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 300);
+        if (mapInstance) setTimeout(() => mapInstance.resize(), 300);
     }
 
     document.addEventListener('touchend', handlePanelEndOrCancel);
@@ -604,7 +619,7 @@ function applySettings() {
         if (bottomShift) bottomShift.style.display = 'none';
 
         if (mapInstance) { 
-            setTimeout(() => mapInstance.invalidateSize(), 300); 
+            setTimeout(() => mapInstance.resize(), 300); 
             const panel = document.getElementById('bottom-panel');
             if (panel && (!panel.style.transform || panel.style.transform === 'none')) {
                 const snapMiddle = window.innerHeight * 0.5;
@@ -825,7 +840,7 @@ function switchView(index, isInstant = false, fromPopState = false) {
     if(index === 4) { calculatePunctuality(); }
     
     if (index === 0 && document.body.classList.contains('map-enabled') && mapInstance) {
-        setTimeout(() => mapInstance.invalidateSize(), 350);
+        setTimeout(() => mapInstance.resize(), 350);
     }
     
     if (!fromPopState && index !== 0) pushHistory();
@@ -1301,7 +1316,7 @@ function renderActiveTimers() {
     activeTimers.forEach((timer, idx) => {
         const titleStr = timer.storeName ? `${timer.storeName} #${timer.orderNumber}` : `訂單計時 #${idx + 1}`;
         
-        // Notion 低飽和同色系標籤：即時判定超時狀態
+        // Notion 低飽和同色系狀態標籤：即時判定超時狀態[cite: 2]
         let estStr = '';
         if (timer.estimatedTime) {
             const isOverdue = (now - timer.startTime) > timer.estimatedTime * 60000;
@@ -1322,7 +1337,7 @@ function updateTimersDisplay() {
         const el = document.getElementById(`duration_${timer.id}`); 
         if (el) el.innerText = formatDuration(now - timer.startTime); 
         
-        // 動態比對時間：未超時保持綠色，超時自動轉為土色
+        // 每秒動態比對預估時間：未超時保持綠色，超時自動轉為土色
         if (timer.estimatedTime) {
             const estEl = document.getElementById(`est_badge_${timer.id}`);
             if (estEl) {
