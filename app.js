@@ -11,11 +11,11 @@ let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDa
 
 let sideMenuOpen = false;
 
-// 導航專用精緻向量圖示 (SVG) - 收入採用卡片樣式[cite: 8]
+// 導航專用精緻向量圖示 (SVG) - 收入已替換為卡片樣式
 const NAV_ICONS = [
     // 0: 首頁 (House)
     `<svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-    // 1: 收入 (Card)[cite: 8]
+    // 1: 收入 (Card)
     `<svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>`,
     // 2: 小費 (Hand with Coins)
     `<svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg>`,
@@ -24,7 +24,7 @@ const NAV_ICONS = [
     // 4: 準時率 (Clock Check)
     `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/><path d="m16 9 2 2 4-4"/></svg>`,
     // 5: 設定 (Gear)
-    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+    `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
 ];
 
 // 瀏覽器返回鍵狀態控制
@@ -45,15 +45,12 @@ function pushHistory() {
     if (!isPopStateAction) history.pushState({}, '');
 }
 
-// MapLibre GL 向量地圖變數 [經度, 緯度]
+// MapLibre GL 地圖變數
 let mapInstance = null;
 let userMarker = null;
-let currentLoc = [121.1970, 25.0620]; // 預設桃園大園區
+let currentLoc = [25.0478, 121.5170]; // 預設 [緯度, 經度]
 let geoWatchId = null;
 let hasCenteredMapInit = false; 
-
-// 免 API Key 向量圖資樣式
-const MAP_STYLE_URL = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
 
 /* ================== 日期與時間工具 ================== */
 function getDateKey(ts) { const d = new Date(ts); return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`; }
@@ -75,7 +72,6 @@ function injectNewStyles() {
         body:not(.map-enabled) #costs-list { padding-bottom: 80px; }
         body:not(.map-enabled) .handle-bar-wrapper { display: none !important; }
         body:not(.map-enabled) .panel-header { cursor: default !important; }
-        
         body:not(.map-enabled) #btn-menu { display: none !important; }
         
         body.map-enabled #map {
@@ -107,6 +103,7 @@ function injectNewStyles() {
         .side-nav-item .nav-icon { margin-right: 15px; width: 24px; text-align: center; font-size: 1.2rem; }
         .side-nav-item.active { background: var(--timer-bg); color: var(--primary); font-weight: bold; border-left: 4px solid var(--primary); }
 
+        /* 上線時段向上平移約兩行高度 */
         #side-menu-shift-section {
             margin-bottom: 50px !important;
         }
@@ -273,43 +270,194 @@ window.onload = function() {
     switchView(0, true);
 };
 
-/* ================== MapLibre GL 向量地圖與空心路網渲染邏輯 ================== */
+/* ================== MapLibre GL 向量地圖引擎 ================== */
+function generateShieldIcon() {
+    const width = 64;
+    const height = 36;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    const r = 4;
+    const x = 1.5, y = 1.5, w = width - 3, h = height - 3;
+
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#1e293b';
+    ctx.stroke();
+
+    return ctx.getImageData(0, 0, width, height);
+}
+
 function initMap() {
-    if (typeof maplibregl === 'undefined') { console.warn('無法載入 MapLibre GL 資源'); return; }
+    if (typeof maplibregl === 'undefined') { console.warn('無法載入 MapLibre 地圖資源'); return; }
     if (mapInstance) return;
     
     mapInstance = new maplibregl.Map({
         container: 'map',
-        style: MAP_STYLE_URL,
-        center: currentLoc,
-        zoom: 14,
-        pitch: 0,
+        style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+        center: [currentLoc[1], currentLoc[0]],
+        zoom: 15,
         attributionControl: false
     });
 
-    // 向量地圖載入後，套用空心路網與清爽色調
-    mapInstance.on('load', () => {
-        setupHollowRoads();
-    });
-
-    // 建立藍色光錐定位標記
+    // 建立藍色定位方向標記
     const markerEl = document.createElement('div');
     markerEl.className = 'custom-blue-dot';
-    markerEl.innerHTML = `<div class="custom-blue-dot-cone" id="map-dir-marker"></div>`;
+    markerEl.innerHTML = `
+        <div id="map-dir-marker" style="width: 18px; height: 18px; background-color: #007aff; border: 2.5px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: relative; transition: transform 0.2s ease-out; display: flex; justify-content: center; align-items: center;">
+            <div style="position: absolute; bottom: 50%; left: 50%; transform: translateX(-50%); width: 220px; height: 100px; background: radial-gradient(circle at bottom center, rgba(0, 122, 255, 0.4) 0%, rgba(0, 122, 255, 0) 70%); clip-path: polygon(50% 100%, 0% 0%, 100% 0%); transform-origin: bottom center; pointer-events: none;"></div>
+        </div>
+    `;
 
     userMarker = new maplibregl.Marker({ element: markerEl })
-        .setLngLat(currentLoc)
+        .setLngLat([currentLoc[1], currentLoc[0]])
         .addTo(mapInstance);
+
+    mapInstance.on('load', () => {
+        mapInstance.addImage('shield-box', generateShieldIcon(), {
+            content: [6, 6, 58, 30],
+            stretchX: [[14, 50]],
+            stretchY: [[10, 26]]
+        });
+
+        const layers = mapInstance.getStyle().layers;
+        let firstSymbolId;
+        for (const layer of layers) {
+            if (layer.type === 'symbol') {
+                firstSymbolId = layer.id;
+                break;
+            }
+        }
+
+        // 淨化小巷與水域
+        layers.forEach(layer => {
+            if (layer.id.includes('road') && layer.type === 'line') {
+                mapInstance.setPaintProperty(layer.id, 'line-color', '#f1f5f9');
+            }
+            if (layer.id.includes('water') && layer.type === 'fill') {
+                mapInstance.setPaintProperty(layer.id, 'fill-color', '#e2f1fd');
+            }
+        });
+
+        const roadSource = 'carto';
+        const roadSourceLayer = 'transportation';
+        const majorRoadFilter = [
+            'all',
+            ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary']
+        ];
+
+        // 1. 【外層軌道】Uber 風格三色動態路況 (綠/橙/紅細線)
+        mapInstance.addLayer({
+            'id': 'uber-traffic-casing',
+            'type': 'line',
+            'source': roadSource,
+            'source-layer': roadSourceLayer,
+            'filter': majorRoadFilter,
+            'layout': {
+                'line-cap': 'round',
+                'line-join': 'round'
+            },
+            'paint': {
+                'line-color': [
+                    'case',
+                    ['==', ['%', ['id'], 17], 0], '#ef4444', // 紅色 (壅塞)
+                    ['==', ['%', ['id'], 6], 0], '#f97316',  // 橙色 (車多)
+                    '#22c55e'                                // 翠綠色 (順暢)
+                ],
+                'line-width': [
+                    'interpolate', ['linear'], ['zoom'],
+                    11, 3.5,
+                    13, 6,
+                    14.5, 8.5,
+                    16, 13,
+                    18, 20
+                ]
+            }
+        }, firstSymbolId);
+
+        // 2. 【內層路心】純白填色，形成雙線細空心效果
+        mapInstance.addLayer({
+            'id': 'uber-traffic-inner',
+            'type': 'line',
+            'source': roadSource,
+            'source-layer': roadSourceLayer,
+            'filter': majorRoadFilter,
+            'layout': {
+                'line-cap': 'round',
+                'line-join': 'round'
+            },
+            'paint': {
+                'line-color': '#ffffff',
+                'line-width': [
+                    'interpolate', ['linear'], ['zoom'],
+                    11, 1.8,
+                    13, 3.8,
+                    14.5, 5.8,
+                    16, 9.5,
+                    18, 15
+                ]
+            }
+        }, firstSymbolId);
+
+        // 3. 【縣鄉道盾牌標籤】(桃31, 桃121, 61, 15 等細黑框白底小方盒)
+        mapInstance.addLayer({
+            'id': 'road-shield-labels',
+            'type': 'symbol',
+            'source': roadSource,
+            'source-layer': 'transportation_name',
+            'filter': [
+                'all',
+                ['has', 'ref']
+            ],
+            'layout': {
+                'symbol-placement': 'line',
+                'text-field': ['get', 'ref'],
+                'text-size': [
+                    'interpolate', ['linear'], ['zoom'],
+                    12, 9.5,
+                    15, 10.5,
+                    18, 12.5
+                ],
+                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                'text-rotation-alignment': 'viewport',
+                'text-pitch-alignment': 'viewport',
+                'icon-image': 'shield-box',
+                'icon-text-fit': 'both',
+                'icon-text-fit-padding': [1.5, 3.5, 1.5, 3.5],
+                'icon-rotation-alignment': 'viewport',
+                'symbol-spacing': 260
+            },
+            'paint': {
+                'text-color': '#0f172a'
+            }
+        });
+    });
         
     if ("geolocation" in navigator) {
         geoWatchId = navigator.geolocation.watchPosition(
             (position) => {
-                currentLoc = [position.coords.longitude, position.coords.latitude];
+                currentLoc = [position.coords.latitude, position.coords.longitude];
                 if (userMarker) {
-                    userMarker.setLngLat(currentLoc);
+                    userMarker.setLngLat([currentLoc[1], currentLoc[0]]);
                     if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
                         const markerDiv = document.getElementById('map-dir-marker');
-                        if (markerDiv) markerDiv.style.transform = `translateX(-50%) rotate(${position.coords.heading}deg)`;
+                        if (markerDiv) markerDiv.style.transform = `rotate(${position.coords.heading}deg)`;
                     }
                 }
                 if (!hasCenteredMapInit) {
@@ -317,7 +465,7 @@ function initMap() {
                     hasCenteredMapInit = true;
                 } else if (mapInstance) {
                     const bounds = mapInstance.getBounds();
-                    if (!bounds.contains(currentLoc)) recenterMap();
+                    if (!bounds.contains([currentLoc[1], currentLoc[0]])) recenterMap();
                 }
             },
             (error) => { console.warn("定位獲取失敗: ", error); },
@@ -328,90 +476,18 @@ function initMap() {
     setTimeout(() => { if (mapInstance) mapInstance.resize(); }, 500);
 }
 
-// 建立 Uber 風格鮮綠色空心路網 (Casing + Inner)[cite: 10]
-function setupHollowRoads() {
-    if (!mapInstance || !mapInstance.getStyle()) return;
-    const layers = mapInstance.getStyle().layers;
-
-    // 找到第一個文字/標誌圖層，確保空心路網位於文字下方
-    let firstSymbolId;
-    for (const layer of layers) {
-        if (layer.type === 'symbol') {
-            firstSymbolId = layer.id;
-            break;
-        }
-    }
-
-    // 弱化底圖雜亂小巷，調亮水體為淡藍色
-    layers.forEach(layer => {
-        if (layer.id.includes('road') && layer.type === 'line') {
-            mapInstance.setPaintProperty(layer.id, 'line-color', '#f1f5f9');
-        }
-        if (layer.id.includes('water') && layer.type === 'fill') {
-            mapInstance.setPaintProperty(layer.id, 'fill-color', '#e0f2fe');
-        }
-    });
-
-    const roadSource = 'carto';
-    const roadSourceLayer = 'transportation';
-    const majorRoadFilter = [
-        'all',
-        ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary']
-    ];
-
-    // 外軌：鮮綠色邊線 (Casing)
-    if (!mapInstance.getLayer('custom-road-casing')) {
-        mapInstance.addLayer({
-            'id': 'custom-road-casing',
-            'type': 'line',
-            'source': roadSource,
-            'source-layer': roadSourceLayer,
-            'filter': majorRoadFilter,
-            'layout': { 'line-cap': 'round', 'line-join': 'round' },
-            'paint': {
-                'line-color': '#22c55e',
-                'line-width': [
-                    'interpolate', ['linear'], ['zoom'],
-                    12, 4.5,
-                    14, 7,
-                    16, 12,
-                    18, 20
-                ]
-            }
-        }, firstSymbolId);
-    }
-
-    // 內軌：純白路心 (Inner)，呈現空心線條質感 (══╦═══╝)
-    if (!mapInstance.getLayer('custom-road-inner')) {
-        mapInstance.addLayer({
-            'id': 'custom-road-inner',
-            'type': 'line',
-            'source': roadSource,
-            'source-layer': roadSourceLayer,
-            'filter': majorRoadFilter,
-            'layout': { 'line-cap': 'round', 'line-join': 'round' },
-            'paint': {
-                'line-color': '#ffffff',
-                'line-width': [
-                    'interpolate', ['linear'], ['zoom'],
-                    12, 2.5,
-                    14, 4.5,
-                    16, 8.5,
-                    18, 15
-                ]
-            }
-        }, firstSymbolId);
-    }
-}
-
 function recenterMap(instant = false) {
     if (mapInstance && currentLoc) {
-        mapInstance.easeTo({
-            center: currentLoc,
-            zoom: Math.max(mapInstance.getZoom(), 14.5),
-            offset: [0, -window.innerHeight * 0.15],
-            duration: instant ? 0 : 350
-        });
+        const zoom = mapInstance.getZoom() || 15;
+        const point = mapInstance.project([currentLoc[1], currentLoc[0]]);
+        point.y += (window.innerHeight / 4); 
+        const targetLngLat = mapInstance.unproject(point);
+        
+        if (instant) {
+            mapInstance.jumpTo({ center: targetLngLat, zoom: zoom });
+        } else {
+            mapInstance.easeTo({ center: targetLngLat, zoom: zoom, duration: 250 });
+        }
     }
 }
 
@@ -1316,7 +1392,6 @@ function renderActiveTimers() {
     activeTimers.forEach((timer, idx) => {
         const titleStr = timer.storeName ? `${timer.storeName} #${timer.orderNumber}` : `訂單計時 #${idx + 1}`;
         
-        // Notion 低飽和同色系狀態標籤：即時判定超時狀態[cite: 2]
         let estStr = '';
         if (timer.estimatedTime) {
             const isOverdue = (now - timer.startTime) > timer.estimatedTime * 60000;
@@ -1337,7 +1412,6 @@ function updateTimersDisplay() {
         const el = document.getElementById(`duration_${timer.id}`); 
         if (el) el.innerText = formatDuration(now - timer.startTime); 
         
-        // 每秒動態比對預估時間：未超時保持綠色，超時自動轉為土色
         if (timer.estimatedTime) {
             const estEl = document.getElementById(`est_badge_${timer.id}`);
             if (estEl) {
