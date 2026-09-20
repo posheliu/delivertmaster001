@@ -235,7 +235,6 @@
                 <div class="btn-grid" style="margin-top: 10px;">
                     <button class="btn btn-outline" onclick="addUser()">新增使用者</button>
                     <button class="btn btn-outline" onclick="renameUser()">重新命名</button>
-                    <!-- 移除使用者功能，佔據兩個網格寬度 -->
                     <button class="btn btn-outline" onclick="openUserModal('remove')" style="grid-column: span 2; border-color:var(--danger); color:var(--danger);">移除使用者</button>
                 </div>
             </div>
@@ -366,29 +365,59 @@
         </div>
     </div>
 
-    <!-- 底部導航 (未啟用滿版地圖時顯示) -->
+    <!-- 底部導航 (未啟用滿版地圖時顯示 - 套用向量 SVG 圖示) -->
     <div class="bottom-nav">
-        <a class="nav-item active" id="nav-0" onclick="switchView(0)"><span class="nav-icon">☗</span><span>首頁</span></a>
-        <a class="nav-item" id="nav-1" onclick="switchView(1)"><span class="nav-icon">＄</span><span>收入</span></a>
-        <a class="nav-item" id="nav-2" onclick="switchView(2)"><span class="nav-icon">♥&#xFE0E;</span><span>小費</span></a>
-        <a class="nav-item" id="nav-3" onclick="switchView(3)"><span class="nav-icon">☈</span><span>成本</span></a>
-        <a class="nav-item" id="nav-4" onclick="switchView(4)"><span class="nav-icon">◕</span><span>準時率</span></a>
-        <a class="nav-item" id="nav-5" onclick="switchView(5)"><span class="nav-icon">⛯</span><span>設定</span></a>
+        <a class="nav-item active" id="nav-0" onclick="switchView(0)">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+            <span>首頁</span>
+        </a>
+        <a class="nav-item" id="nav-1" onclick="switchView(1)">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M16 12h6v4h-6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z"/><circle cx="18" cy="14" r="1"/></svg></span>
+            <span>收入</span>
+        </a>
+        <a class="nav-item" id="nav-2" onclick="switchView(2)">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg></span>
+            <span>小費</span>
+        </a>
+        <a class="nav-item" id="nav-3" onclick="switchView(3)">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg></span>
+            <span>成本</span>
+        </a>
+        <a class="nav-item" id="nav-4" onclick="switchView(4)">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/><path d="m16 9 2 2 4-4"/></svg></span>
+            <span>準時率</span>
+        </a>
+        <a class="nav-item" id="nav-5" onclick="switchView(5)">
+            <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span>設定</span>
+        </a>
     </div>
 
-    <!-- 側邊攔選單 (滿版地圖時顯示) -->
+    <!-- 側邊攔選單 (滿版地圖時顯示 - 套用向量 SVG 圖示) -->
     <div class="side-menu-overlay" id="side-menu-overlay" onclick="toggleSideMenu()"></div>
     <div class="side-menu" id="side-menu">
         <div class="side-menu-header">
             <h2>功能選單</h2>
         </div>
         <div class="side-menu-content">
-            <a class="side-nav-item active" id="side-nav-0" onclick="switchView(0); toggleSideMenu()"><span class="nav-icon">☗</span>首頁</a>
-            <a class="side-nav-item" id="side-nav-1" onclick="switchView(1); toggleSideMenu()"><span class="nav-icon">＄</span>收入</a>
-            <a class="side-nav-item" id="side-nav-2" onclick="switchView(2); toggleSideMenu()"><span class="nav-icon">♥&#xFE0E;</span>小費</a>
-            <a class="side-nav-item" id="side-nav-3" onclick="switchView(3); toggleSideMenu()"><span class="nav-icon">☈</span>成本</a>
-            <a class="side-nav-item" id="side-nav-4" onclick="switchView(4); toggleSideMenu()"><span class="nav-icon">◕</span>準時率</a>
-            <a class="side-nav-item" id="side-nav-5" onclick="switchView(5); toggleSideMenu()"><span class="nav-icon">⛯</span>設定</a>
+            <a class="side-nav-item active" id="side-nav-0" onclick="switchView(0); toggleSideMenu()">
+                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.5z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>首頁
+            </a>
+            <a class="side-nav-item" id="side-nav-1" onclick="switchView(1); toggleSideMenu()">
+                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M16 12h6v4h-6a2 2 0 0 1-2-2v0a2 2 0 0 1 2-2z"/><circle cx="18" cy="14" r="1"/></svg></span>收入
+            </a>
+            <a class="side-nav-item" id="side-nav-2" onclick="switchView(2); toggleSideMenu()">
+                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><circle cx="12" cy="4" r="2"/></svg></span>小費
+            </a>
+            <a class="side-nav-item" id="side-nav-3" onclick="switchView(3); toggleSideMenu()">
+                <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg></span>成本
+            </a>
+            <a class="side-nav-item" id="side-nav-4" onclick="switchView(4); toggleSideMenu()">
+                <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 15 14"/><path d="m16 9 2 2 4-4"/></svg></span>準時率
+            </a>
+            <a class="side-nav-item" id="side-nav-5" onclick="switchView(5); toggleSideMenu()">
+                <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>設定
+            </a>
         </div>
         <!-- 漢堡列底部的打卡按鈕 (僅滿版地圖顯示) -->
         <div style="padding: 20px; border-top: 1px solid var(--border); background: var(--card-bg);" id="side-menu-shift-section">
