@@ -365,7 +365,7 @@ function initMap() {
             ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary']
         ];
 
-        // 1. 【外層軌道】適度加粗外線寬度，凸顯立體感
+        // 1. 【外層軌道】加粗醒目外線
         mapInstance.addLayer({
             'id': 'uber-traffic-casing',
             'type': 'line',
@@ -394,7 +394,7 @@ function initMap() {
             }
         }, firstSymbolId);
 
-        // 2. 【內層路心】純白路心，保持約 2.0px~2.3px 的醒目外框厚度
+        // 2. 【內層路心】純白路心，保持約 2.0px~2.3px 的扎實外框厚度
         mapInstance.addLayer({
             'id': 'uber-traffic-inner',
             'type': 'line',
@@ -767,7 +767,7 @@ function confirmOrderNumber() {
     if (val !== '') { closeModal('order-number-modal'); if (pendingOrderAction) { pendingOrderAction(val); pendingOrderAction = null; } }
 }
 
-/* ================== 每週油耗與圖表 ================== */
+/* ================== 每週油耗與長條圖 (真實像素高低差運算) ================== */
 function calculateWeeklyFuel(startTs, endTs) {
     const allFuel = costRecords.filter(r => r.type === '加油' && r.mileage && Number(r.mileage) > 0).sort((a,b) => a.timestamp - b.timestamp);
     const weeklyFuel = allFuel.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
@@ -784,11 +784,37 @@ function nextWeek() { const sInput = document.getElementById('cost-search-input'
 function getWeekNumber(d) { const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay()||7)); return Math.ceil(( ( (date - new Date(Date.UTC(date.getUTCFullYear(),0,1))) / 86400000) + 1)/7); }
 
 function renderWeeklyChart(containerId, records, type) {
-    const container = document.getElementById(containerId); if (!container) return;
-    let dailyTotals = [0, 0, 0, 0, 0, 0, 0], dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
-    records.forEach(r => { let dayIdx = new Date(r.timestamp).getDay() - 1; if (dayIdx === -1) dayIdx = 6; dailyTotals[dayIdx] += r.amount; });
-    const maxAmt = Math.max(...dailyTotals, 1); let html = '';
-    for (let i = 0; i < 7; i++) { let heightPct = Math.max((dailyTotals[i] / maxAmt) * 100, dailyTotals[i] > 0 ? 5 : 0); html += `<div class="chart-bar-wrap"><div class="chart-val">${dailyTotals[i] > 0 ? fmtNum(dailyTotals[i]) : ''}</div><div class="chart-bar ${type}" style="height: ${heightPct}%;"></div><div class="chart-label">${dayLabels[i]}</div></div>`; }
+    const container = document.getElementById(containerId); 
+    if (!container) return;
+
+    let dailyTotals = [0, 0, 0, 0, 0, 0, 0];
+    const dayLabels = ['一', '二', '三', '四', '五', '六', '日'];
+    
+    records.forEach(r => { 
+        let dayIdx = new Date(r.timestamp).getDay() - 1; 
+        if (dayIdx === -1) dayIdx = 6; 
+        dailyTotals[dayIdx] += r.amount; 
+    });
+
+    const maxAmt = Math.max(...dailyTotals, 1); 
+    const MAX_BAR_HEIGHT = 58; // 長條圖最大高度 (px)，預留頂部金額與底部星期空間
+    let html = '';
+
+    for (let i = 0; i < 7; i++) {
+        // 使用真實像素高度計算，徹底解決不同金額長條等長的問題
+        let barHeight = 2; // 0 元預設為 2px 底線
+        if (dailyTotals[i] > 0) {
+            barHeight = Math.max(Math.round((dailyTotals[i] / maxAmt) * MAX_BAR_HEIGHT), 6);
+        }
+
+        html += `
+            <div class="chart-bar-wrap">
+                <div class="chart-val">${dailyTotals[i] > 0 ? fmtNum(Math.round(dailyTotals[i])) : ''}</div>
+                <div class="chart-bar ${type}" style="height: ${barHeight}px;"></div>
+                <div class="chart-label">${dayLabels[i]}</div>
+            </div>
+        `;
+    }
     container.innerHTML = html;
 }
 
@@ -1032,9 +1058,9 @@ function updateUIState() {
             shiftBadge.style.display = 'none';
             if(shiftBadgeRight) shiftBadgeRight.style.display = 'none';
         }
-        btnSearch.style.display = viewHasSearch[currentViewIndex] ? 'block' : 'none'; 
+        btnSearch.style.display = viewHasSearch[currentViewIndex] ? 'flex' : 'none'; 
         btnBack.style.display = 'none'; 
-        if(btnMenu) btnMenu.style.display = 'block';
+        if(btnMenu) btnMenu.style.display = 'flex';
     } 
 }
 
