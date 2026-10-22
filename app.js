@@ -255,6 +255,9 @@ function loadSettingsForCurrentUser() {
     if(settings.customCardEnable === undefined) settings.customCardEnable = false; if(settings.customCardBg === undefined) settings.customCardBg = '#ffffff'; if(settings.customCardOpacity === undefined) settings.customCardOpacity = 85;
     if(settings.enableMap === undefined) settings.enableMap = true; 
     if(settings.confirmDelivery === undefined) settings.confirmDelivery = false; 
+    if(settings.rangeCalcStart === undefined) settings.rangeCalcStart = '11:00';
+    if(settings.rangeCalcEnd === undefined) settings.rangeCalcEnd = '14:00';
+    if(settings.rangeCalcBasis === undefined) settings.rangeCalcBasis = 'end';
     settings.multiplier = clampMultiplier(settings.multiplier === undefined ? 1 : settings.multiplier);
 }
 
@@ -758,17 +761,21 @@ function toggleConfirmDelivery() { settings.confirmDelivery = document.getElemen
 
 /* ================== 耳機選單 / 倍率調整 ================== */
 function openHeadsetModal() {
-    const m = getCurrentMultiplier();
-    document.getElementById('multiplier-range').value = m;
-    document.getElementById('multiplier-input').value = m.toFixed(2);
+    updateMultiplierUI(getCurrentMultiplier());
     document.getElementById('headset-modal').classList.add('active');
+}
+function updateMultiplierUI(m) {
+    const range = document.getElementById('multiplier-range');
+    range.value = m;
+    range.style.setProperty('--fill', `${((m - 1) / 4) * 100}%`);
+    document.getElementById('multiplier-input').value = m.toFixed(2);
+    document.getElementById('multiplier-preview').innerText = `最低金額試算：$${MIN_AMOUNT} × ${m.toFixed(2)} = ${fmtMoney(calcOrderAmount(0, m))}`;
 }
 function setMultiplier(v) {
     const m = clampMultiplier(v);
     settings.multiplier = m;
     saveSettings();
-    document.getElementById('multiplier-range').value = m;
-    document.getElementById('multiplier-input').value = m.toFixed(2);
+    updateMultiplierUI(m);
 }
 function onMultiplierRangeInput() { setMultiplier(document.getElementById('multiplier-range').value); }
 function onMultiplierNumberChange() { setMultiplier(document.getElementById('multiplier-input').value); }
@@ -1563,6 +1570,9 @@ function renderDailyDetail() {
         if (activeWait && getDateKey(activeWait.startTime) === dateKey) { const currWait = Math.floor((Date.now() - activeWait.startTime) / 60000); totalWaitMins += currWait; maxWaitMins = Math.max(maxWaitMins, currWait); }
 
         statsGrid.style.display = 'grid';
+        document.getElementById('daily-range-calc').style.display = 'block';
+        initRangeCalcInputs();
+        calcDailyRange();
         document.getElementById('daily-detail-online-hours').innerText = formatMins(totalShiftMins);
         document.getElementById('daily-detail-wait-total').innerText = formatMins(totalWaitMins);
         document.getElementById('daily-detail-wait-max').innerText = formatMins(maxWaitMins);
@@ -1575,6 +1585,7 @@ function renderDailyDetail() {
         document.getElementById('daily-detail-amount').style.color = 'var(--success)';
         statsGrid.style.display = 'none';
         tabsContainer.style.display = 'none';
+        document.getElementById('daily-range-calc').style.display = 'none';
     } else if (currentDailyContext === 'cost') {
         document.getElementById('daily-detail-type-label').innerText = '成本支出總額';
         const dailyRecords = costRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
@@ -1582,9 +1593,40 @@ function renderDailyDetail() {
         document.getElementById('daily-detail-amount').style.color = 'var(--text-main)';
         statsGrid.style.display = 'none';
         tabsContainer.style.display = 'none';
+        document.getElementById('daily-range-calc').style.display = 'none';
     }
     
     renderDailyDetailList();
+}
+
+/* ================== 單日明細：區間試算 ================== */
+function timeStrToMins(str) { if (!str || !str.includes(':')) return null; const [h, m] = str.split(':').map(Number); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
+function initRangeCalcInputs() {
+    document.getElementById('range-calc-start').value = settings.rangeCalcStart;
+    document.getElementById('range-calc-end').value = settings.rangeCalcEnd;
+    document.querySelectorAll('input[name="range-calc-basis"]').forEach(r => r.checked = (r.value === settings.rangeCalcBasis));
+}
+function onRangeCalcChange() {
+    settings.rangeCalcStart = document.getElementById('range-calc-start').value || '00:00';
+    settings.rangeCalcEnd = document.getElementById('range-calc-end').value || '23:59';
+    const basis = document.querySelector('input[name="range-calc-basis"]:checked');
+    settings.rangeCalcBasis = basis ? basis.value : 'end';
+    saveSettings();
+    calcDailyRange();
+}
+function calcDailyRange() {
+    const dateKey = getDateKey(currentDailyDateObj.getTime());
+    const s = timeStrToMins(settings.rangeCalcStart), e = timeStrToMins(settings.rangeCalcEnd);
+    const useStart = settings.rangeCalcBasis === 'start';
+    const inRange = (t) => {
+        if (t === null || s === null || e === null) return false;
+        return s <= e ? (t >= s && t <= e) : (t >= s || t <= e); // 支援跨午夜，如 22:00 ~ 02:00
+    };
+    const list = historyRecords.filter(r => r.dateKey === dateKey && !r.isCancelled && inRange(timeStrToMins(useStart ? r.startTimeStr : r.endTimeStr)));
+    const total = list.reduce((sum, r) => sum + r.amount, 0);
+    document.getElementById('range-calc-count').innerText = `${list.length}張`;
+    document.getElementById('range-calc-amount').innerText = fmtMoney(total);
+    document.getElementById('range-calc-avg').innerText = fmtMoney(list.length ? total / list.length : 0);
 }
 
 function renderDailyDetailList() {
@@ -1620,6 +1662,7 @@ function renderDailyDetailList() {
         else dailyRecords.forEach(r => { let tags = `<span class="tag">${r.type}</span>`; if((r.type === '保養維修' || r.type === '加油') && r.mileage) tags += `<span class="tag">里程:${fmtNum(r.mileage)}</span>`; html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('cost', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr} ${tags}</div><div class="record-desc">${r.memo || '無備註'}</div></div><div class="record-amount" style="color:var(--text-main);">- ${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteCost('${r.id}')">刪除</div></div></div>`; });
     }
     listContainer.innerHTML = html;
+    if (currentDailyContext === 'income') calcDailyRange();
 }
 
 /* ================== 編輯與查詢邏輯 ================== */
