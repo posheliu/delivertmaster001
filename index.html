@@ -259,6 +259,16 @@
 
         <!-- 視圖 5: 設定 -->
         <div id="view-settings" class="view-section">
+            <!-- 設定分頁 -->
+            <div class="settings-tabs horizontal-scroll-ignore">
+                <div class="settings-tab active" data-tab="general" onclick="switchSettingsTab('general')">一般</div>
+                <div class="settings-tab" data-tab="appearance" onclick="switchSettingsTab('appearance')">外觀</div>
+                <div class="settings-tab" data-tab="users" onclick="switchSettingsTab('users')">使用者</div>
+                <div class="settings-tab" data-tab="data" onclick="switchSettingsTab('data')">資料</div>
+            </div>
+
+            <!-- 分頁：一般 -->
+            <div class="settings-pane" data-pane="general">
             <div class="card">
                 <h2>功能與操作設定</h2>
                 <div class="input-group" style="margin-top: 15px; display: flex; align-items: center; justify-content: space-between;">
@@ -275,8 +285,13 @@
                 </div>
             </div>
 
+            </div>
+
+            <!-- 分頁：使用者 -->
+            <div class="settings-pane" data-pane="users" style="display:none;">
             <div class="card">
                 <h2>使用者管理</h2>
+                <p class="settings-current-user">目前使用者：<b id="settings-current-user-name">--</b></p>
                 <div class="btn-grid" style="margin-top: 10px;">
                     <button class="btn btn-outline" onclick="addUser()">新增使用者</button>
                     <button class="btn btn-outline" onclick="renameUser()">重新命名</button>
@@ -284,6 +299,10 @@
                 </div>
             </div>
 
+            </div>
+
+            <!-- 分頁：外觀 -->
+            <div class="settings-pane" data-pane="appearance" style="display:none;">
             <div class="card">
                 <h2>高質感預設組合 (一鍵套用)</h2>
                 <div class="btn-grid" style="margin-top:10px;">
@@ -388,16 +407,35 @@
                     </div>
                 </div>
 
-                <div class="input-group" style="margin-top: 25px; display: flex; align-items: center; justify-content: space-between;">
-                    <label style="margin-bottom:0;">字體大小</label>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn btn-outline" style="padding:6px; width:auto;" onclick="setFontSize('14px')">小</button>
-                        <button class="btn btn-outline" style="padding:6px; width:auto;" onclick="setFontSize('16px')">中</button>
-                        <button class="btn btn-outline" style="padding:6px; width:auto;" onclick="setFontSize('18px')">大</button>
+            </div>
+
+            <div class="card">
+                <h2>文字設定</h2>
+                <div class="input-group">
+                    <label style="display:flex; justify-content:space-between;"><span>字體大小</span><b id="font-size-val" style="color:var(--primary);">16px</b></label>
+                    <div class="font-size-row">
+                        <span class="font-size-a small">A</span>
+                        <input type="range" id="font-size-range" class="multiplier-range" min="12" max="24" step="1" value="16" oninput="onFontSizeInput()">
+                        <span class="font-size-a large">A</span>
                     </div>
+                    <button class="btn btn-outline settings-mini-btn" onclick="setFontSize('16px')">恢復預設 (16px)</button>
+                </div>
+
+                <div class="input-group" style="margin-top: 18px; padding-top: 15px; border-top: 1px dashed var(--border);">
+                    <label>文字顏色</label>
+                    <div class="text-color-row">
+                        <input type="color" id="picker-text-color" value="#3f3f46" onchange="onTextColorChange()">
+                        <div class="text-color-preview" id="text-color-preview">範例文字 Aa 123</div>
+                    </div>
+                    <div class="text-color-msg" id="text-color-msg"></div>
+                    <button class="btn btn-outline settings-mini-btn" onclick="resetTextColor()">恢復主題預設文字色</button>
                 </div>
             </div>
 
+            </div>
+
+            <!-- 分頁：資料 -->
+            <div class="settings-pane" data-pane="data" style="display:none;">
             <div class="card">
                 <h2>資料管理 (匯入/匯出)</h2>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
@@ -406,6 +444,7 @@
                     <input type="file" id="import-file" style="display:none;" accept=".json" onchange="importData(event)">
                 </div>
                 <button class="btn" style="background: var(--danger); border: none; color: #ffffff;" onclick="clearAllData()">清除當前使用者紀錄</button>
+            </div>
             </div>
         </div>
     </div>
@@ -553,7 +592,7 @@
                                 <div class="range-calc-item"><span>平均每單</span><strong id="range-calc-avg" style="color:var(--text-main);">$0.00</strong></div>
                             </div>
                             <button class="btn btn-outline range-calc-reset" onclick="resetRangeCalc()">清除區間（恢復預設）</button>
-                            <div class="range-calc-note">* 預設為當日第一單 ～ 最後一單的時間，不含取消訂單</div>
+                            <div class="range-calc-note">* 預設為當日第一單 ～ 最後一單的時間（已取餐的取消單也正常計入）</div>
                         </div>
                     </div>
                 </div>
@@ -726,7 +765,7 @@
             <div id="headset-pane-campaigns" class="headset-pane" style="display:none;">
                 <button class="btn" onclick="openCampaignEditor()">＋ 新增達標活動</button>
                 <div id="campaign-list" style="margin-top: 14px;"></div>
-                <p class="multiplier-note">* 以訂單「完成時間」計算是否落在活動區間內，不含取消訂單。<br>* 只會獲得一個達標獎金（取已達成目標中最高的獎金），活動結束後自動計入結束當天的收入。</p>
+                <p class="multiplier-note">* 以「接單時間」（計時器開始）計算是否落在活動區間內，配送超過活動時間仍算在內；已取餐的取消單也正常計入。<br>* 只會獲得一個達標獎金（取已達成目標中最高的獎金），活動結束後自動計入結束當天的收入。</p>
             </div>
 
             <!-- 新增 / 編輯達標活動 -->
