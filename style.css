@@ -609,7 +609,11 @@ body.night-mode .multiplier-range { background: linear-gradient(to right, var(--
 .range-calc-result { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); text-align: center; }
 .range-calc-item span { font-size: 0.8rem; color: var(--text-muted); }
 .range-calc-item strong { display: block; font-size: 1.15rem; margin-top: 4px; }
-.range-calc-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; text-align: right; }
+.range-calc-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; }
+.range-calc-card h2.collapsible-header { margin-bottom: 0; }
+.range-calc-reset { margin-top: 14px; padding: 11px; font-size: 0.95rem; }
+.range-calc-error { margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 0.85rem; font-weight: bold; text-align: center; color: var(--danger); background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); }
+.range-calc-inputs .form-control.invalid { border-color: var(--danger); outline: 2px solid rgba(239, 68, 68, 0.35); }
 
 /* 單筆結算卡片：金額下方火焰 */
 .record-amount-wrap { display: flex; flex-direction: column; align-items: center; margin-right: 10px; cursor: pointer; }
