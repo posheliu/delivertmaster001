@@ -183,8 +183,10 @@ function showCustomDialog({ type, title, message, defaultValue = '', confirmText
             inputGroup.style.display = 'block';
             inputEl.value = defaultValue;
             if (isNumeric) {
+                // isNumeric: true → 整數數字鍵盤；'decimal' → 含小數點的數字鍵盤
                 inputEl.type = 'number';
-                inputEl.inputMode = 'numeric';
+                inputEl.inputMode = isNumeric === 'decimal' ? 'decimal' : 'numeric';
+                inputEl.step = 'any';
             } else {
                 inputEl.type = 'text';
                 inputEl.inputMode = 'text';
@@ -255,8 +257,6 @@ function loadSettingsForCurrentUser() {
     if(settings.customCardEnable === undefined) settings.customCardEnable = false; if(settings.customCardBg === undefined) settings.customCardBg = '#ffffff'; if(settings.customCardOpacity === undefined) settings.customCardOpacity = 85;
     if(settings.enableMap === undefined) settings.enableMap = true; 
     if(settings.confirmDelivery === undefined) settings.confirmDelivery = false; 
-    if(settings.rangeCalcStart === undefined) settings.rangeCalcStart = '11:00';
-    if(settings.rangeCalcEnd === undefined) settings.rangeCalcEnd = '14:00';
     if(settings.rangeCalcBasis === undefined) settings.rangeCalcBasis = 'end';
     settings.multiplier = clampMultiplier(settings.multiplier === undefined ? 1 : settings.multiplier);
 }
@@ -1489,7 +1489,7 @@ function updateTimersDisplay() {
 /* ================== 修改訂單(收入)金額邏輯 ================== */
 async function editIncomeAmount(id) {
     const record = historyRecords.find(r => r.id === id); if (!record) return;
-    const newAmtStr = await appPrompt(`請輸入新的訂單金額\n(原金額: $${record.amount})：`, record.amount, '修改訂單金額');
+    const newAmtStr = await appPrompt(`請輸入新的訂單金額\n(原金額: $${record.amount})：`, record.amount, '修改訂單金額', 'decimal');
     if (newAmtStr !== null && newAmtStr.trim() !== '') {
         const numAmt = Number(newAmtStr); if (isNaN(numAmt) || numAmt < 0) { return await appAlert('請輸入有效的數字', '輸入錯誤'); }
         record.amount = numAmt; localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); renderWeeklyData(); 
@@ -1571,8 +1571,7 @@ function renderDailyDetail() {
 
         statsGrid.style.display = 'grid';
         document.getElementById('daily-range-calc').style.display = 'block';
-        initRangeCalcInputs();
-        calcDailyRange();
+        resetRangeCalc();
         document.getElementById('daily-detail-online-hours').innerText = formatMins(totalShiftMins);
         document.getElementById('daily-detail-wait-total').innerText = formatMins(totalWaitMins);
         document.getElementById('daily-detail-wait-max').innerText = formatMins(maxWaitMins);
@@ -1600,33 +1599,61 @@ function renderDailyDetail() {
 }
 
 /* ================== 單日明細：區間試算 ================== */
+let rangeCalcIsCustom = false; // 使用者是否手動調整過區間 (切換日期時重置)
 function timeStrToMins(str) { if (!str || !str.includes(':')) return null; const [h, m] = str.split(':').map(Number); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
-function initRangeCalcInputs() {
-    document.getElementById('range-calc-start').value = settings.rangeCalcStart;
-    document.getElementById('range-calc-end').value = settings.rangeCalcEnd;
-    document.querySelectorAll('input[name="range-calc-basis"]').forEach(r => r.checked = (r.value === settings.rangeCalcBasis));
+function getRangeBasis() { const r = document.querySelector('input[name="range-calc-basis"]:checked'); return r ? r.value : 'end'; }
+function getDailyValidOrders() { const dateKey = getDateKey(currentDailyDateObj.getTime()); return historyRecords.filter(r => r.dateKey === dateKey && !r.isCancelled); }
+function getRecordTimeStr(r, basis) { return basis === 'start' ? r.startTimeStr : r.endTimeStr; }
+
+// 預設區間：當日第一單 ～ 最後一單的時間
+function getDefaultRange(basis) {
+    const mins = getDailyValidOrders().map(r => timeStrToMins(getRecordTimeStr(r, basis))).filter(v => v !== null);
+    if (mins.length === 0) return null;
+    const fmt = (v) => `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+    return { start: fmt(Math.min(...mins)), end: fmt(Math.max(...mins)) };
 }
-function onRangeCalcChange() {
-    settings.rangeCalcStart = document.getElementById('range-calc-start').value || '00:00';
-    settings.rangeCalcEnd = document.getElementById('range-calc-end').value || '23:59';
-    const basis = document.querySelector('input[name="range-calc-basis"]:checked');
-    settings.rangeCalcBasis = basis ? basis.value : 'end';
-    saveSettings();
+
+function resetRangeCalc() {
+    rangeCalcIsCustom = false;
+    document.querySelectorAll('input[name="range-calc-basis"]').forEach(r => r.checked = (r.value === (settings.rangeCalcBasis || 'end')));
+    const def = getDefaultRange(getRangeBasis());
+    document.getElementById('range-calc-start').value = def ? def.start : '';
+    document.getElementById('range-calc-end').value = def ? def.end : '';
     calcDailyRange();
 }
-function calcDailyRange() {
-    const dateKey = getDateKey(currentDailyDateObj.getTime());
-    const s = timeStrToMins(settings.rangeCalcStart), e = timeStrToMins(settings.rangeCalcEnd);
-    const useStart = settings.rangeCalcBasis === 'start';
-    const inRange = (t) => {
-        if (t === null || s === null || e === null) return false;
-        return s <= e ? (t >= s && t <= e) : (t >= s || t <= e); // 支援跨午夜，如 22:00 ~ 02:00
-    };
-    const list = historyRecords.filter(r => r.dateKey === dateKey && !r.isCancelled && inRange(timeStrToMins(useStart ? r.startTimeStr : r.endTimeStr)));
-    const total = list.reduce((sum, r) => sum + r.amount, 0);
-    document.getElementById('range-calc-count').innerText = `${list.length}張`;
+function onRangeCalcChange() { rangeCalcIsCustom = true; calcDailyRange(); }
+function onRangeBasisChange() {
+    settings.rangeCalcBasis = getRangeBasis(); saveSettings();
+    if (!rangeCalcIsCustom) { resetRangeCalc(); } else { calcDailyRange(); }
+}
+
+function showRangeResult(count, total, errorMsg) {
+    const errEl = document.getElementById('range-calc-error');
+    const startEl = document.getElementById('range-calc-start'), endEl = document.getElementById('range-calc-end');
+    startEl.classList.toggle('invalid', !!errorMsg); endEl.classList.toggle('invalid', !!errorMsg);
+    if (errorMsg) {
+        errEl.innerText = errorMsg; errEl.style.display = 'block';
+        document.getElementById('range-calc-count').innerText = '--';
+        document.getElementById('range-calc-amount').innerText = '--';
+        document.getElementById('range-calc-avg').innerText = '--';
+        return;
+    }
+    errEl.style.display = 'none';
+    document.getElementById('range-calc-count').innerText = `${count}張`;
     document.getElementById('range-calc-amount').innerText = fmtMoney(total);
-    document.getElementById('range-calc-avg').innerText = fmtMoney(list.length ? total / list.length : 0);
+    document.getElementById('range-calc-avg').innerText = fmtMoney(count ? total / count : 0);
+}
+
+function calcDailyRange() {
+    const orders = getDailyValidOrders();
+    const sStr = document.getElementById('range-calc-start').value, eStr = document.getElementById('range-calc-end').value;
+    if (orders.length === 0 && !sStr && !eStr) { showRangeResult(0, 0, null); return; }
+    const s = timeStrToMins(sStr), e = timeStrToMins(eStr);
+    if (s === null || e === null) { showRangeResult(0, 0, '請完整輸入開始與結束時間'); return; }
+    if (s > e) { showRangeResult(0, 0, '區間錯誤：開始時間不可晚於結束時間'); return; }
+    const basis = getRangeBasis();
+    const list = orders.filter(r => { const t = timeStrToMins(getRecordTimeStr(r, basis)); return t !== null && t >= s && t <= e; });
+    showRangeResult(list.length, list.reduce((sum, r) => sum + r.amount, 0), null);
 }
 
 function renderDailyDetailList() {
@@ -1662,7 +1689,7 @@ function renderDailyDetailList() {
         else dailyRecords.forEach(r => { let tags = `<span class="tag">${r.type}</span>`; if((r.type === '保養維修' || r.type === '加油') && r.mileage) tags += `<span class="tag">里程:${fmtNum(r.mileage)}</span>`; html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('cost', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr} ${tags}</div><div class="record-desc">${r.memo || '無備註'}</div></div><div class="record-amount" style="color:var(--text-main);">- ${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteCost('${r.id}')">刪除</div></div></div>`; });
     }
     listContainer.innerHTML = html;
-    if (currentDailyContext === 'income') calcDailyRange();
+    if (currentDailyContext === 'income') { if (rangeCalcIsCustom) calcDailyRange(); else resetRangeCalc(); }
 }
 
 /* ================== 編輯與查詢邏輯 ================== */
