@@ -259,6 +259,7 @@ function loadSettingsForCurrentUser() {
     if(settings.enableMap === undefined) settings.enableMap = true; 
     if(settings.confirmDelivery === undefined) settings.confirmDelivery = false; 
     if(settings.rangeCalcBasis === undefined) settings.rangeCalcBasis = 'end';
+    if(settings.customTextColor === undefined) settings.customTextColor = null;
     settings.multiplier = clampMultiplier(settings.multiplier === undefined ? 1 : settings.multiplier);
 }
 
@@ -681,7 +682,7 @@ function getLuminance(r, g, b) { return (0.299 * r + 0.587 * g + 0.114 * b) / 25
 function hexToRgb(hex) { hex = hex.replace('#', ''); if (hex.length === 3) hex = hex.split('').map(c => c + c).join(''); const num = parseInt(hex, 16); return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }; }
 
 function applySettings() {
-    document.documentElement.style.cssText = ''; document.body.style.removeProperty('--card-bg'); document.body.style.removeProperty('--timer-bg'); document.documentElement.style.fontSize = settings.fontSize;
+    document.documentElement.style.cssText = ''; document.body.style.removeProperty('--card-bg'); document.body.style.removeProperty('--timer-bg'); document.documentElement.style.fontSize = settings.fontSize; syncFontSizeUI();
     document.getElementById('auto-night-toggle').checked = settings.autoNightMode || false; document.getElementById('color-theme-select').value = settings.colorTheme; document.getElementById('effect-theme-select').value = settings.effectTheme;
     document.getElementById('custom-matrix-text-1').value = settings.matrixText1 || ''; document.getElementById('custom-matrix-text-2').value = settings.matrixText2 || ''; document.getElementById('custom-matrix-text-3').value = settings.matrixText3 || '';
     document.getElementById('custom-matrix-input-group').style.display = (settings.effectTheme === 'canvas-matrix-custom') ? 'block' : 'none';
@@ -737,19 +738,78 @@ function applySettings() {
 }
 
 function changeTheme() { settings.colorTheme = document.getElementById('color-theme-select').value; settings.effectTheme = document.getElementById('effect-theme-select').value; saveSettings(); applySettings(); }
-function applyPremiumPreset(colorTheme, effectTheme) { settings.colorTheme = colorTheme; settings.effectTheme = effectTheme; settings.customCardEnable = false; saveSettings(); applySettings(); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+function applyPremiumPreset(colorTheme, effectTheme) { settings.colorTheme = colorTheme; settings.effectTheme = effectTheme; settings.customCardEnable = false; saveSettings(); applySettings(); }
 function applyCustomPalette() { settings.colorTheme = 'custom'; settings.customPrimary = document.getElementById('picker-primary').value; saveSettings(); applySettings(); }
 function saveMatrixText() { settings.matrixText1 = document.getElementById('custom-matrix-text-1').value; settings.matrixText2 = document.getElementById('custom-matrix-text-2').value; settings.matrixText3 = document.getElementById('custom-matrix-text-3').value; saveSettings(); applySettings(); }
 function toggleCustomCard() { settings.customCardEnable = document.getElementById('custom-card-toggle').checked; saveSettings(); applySettings(); }
 function updateCustomCard() { settings.customCardBg = document.getElementById('picker-card-bg').value; settings.customCardOpacity = document.getElementById('picker-card-opacity').value; document.getElementById('card-opacity-val').innerText = settings.customCardOpacity; saveSettings(); applySettings(); }
-function setFontSize(size) { settings.fontSize = size; saveSettings(); applySettings(); }
+function setFontSize(size) { settings.fontSize = size; saveSettings(); document.documentElement.style.fontSize = size; syncFontSizeUI(); } // 拖動時只改字體，不重跑整個主題
 function saveSettings() { localStorage.setItem(getStoreKey('order_settings'), JSON.stringify(settings)); }
 function applyNightMode() { 
     const hour = new Date().getHours(); 
     const isNight = settings.autoNightMode && (hour >= 18 || hour < 6);
     if (isNight) document.body.classList.add('night-mode'); 
     else document.body.classList.remove('night-mode'); 
+    applyTextColor(); // 背景可能改變 → 重新檢查文字顏色是否看得到
 }
+
+/* ================== 字體大小 / 文字顏色 ================== */
+function onFontSizeInput() { setFontSize(document.getElementById('font-size-range').value + 'px'); }
+function syncFontSizeUI() {
+    const px = parseInt(settings.fontSize, 10) || 16;
+    const r = document.getElementById('font-size-range'); if (!r) return;
+    r.value = px; r.style.setProperty('--fill', `${((px - 12) / 12) * 100}%`);
+    document.getElementById('font-size-val').innerText = px + 'px';
+}
+
+const MIN_TEXT_CONTRAST = 3; // 對比低於此值視為「幾乎看不見」
+let colorParseCtx = null;
+function parseCssColor(str) {
+    if (!colorParseCtx) colorParseCtx = document.createElement('canvas').getContext('2d');
+    colorParseCtx.fillStyle = '#000'; colorParseCtx.fillStyle = (str || '').trim() || '#000';
+    const v = colorParseCtx.fillStyle;
+    if (v.startsWith('#')) { const { r, g, b } = hexToRgb(v); return { r, g, b, a: 1 }; }
+    const m = v.match(/rgba?\(([^)]+)\)/); if (!m) return { r: 0, g: 0, b: 0, a: 1 };
+    const p = m[1].split(',').map(x => parseFloat(x));
+    return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+}
+function blendColor(top, bottom) { const a = top.a; return { r: top.r * a + bottom.r * (1 - a), g: top.g * a + bottom.g * (1 - a), b: top.b * a + bottom.b * (1 - a), a: 1 }; }
+function relLuminance({ r, g, b }) { const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); }
+function contrastRatio(c1, c2) { const l1 = relLuminance(c1), l2 = relLuminance(c2); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); }
+// 以目前主題的背景、卡片、輸入框底色檢查文字是否看得清楚，回傳最差的對比值
+function getTextContrast(hex) {
+    const cs = getComputedStyle(document.body);
+    const bg = blendColor(parseCssColor(cs.getPropertyValue('--bg')), { r: 255, g: 255, b: 255, a: 1 });
+    const card = blendColor(parseCssColor(cs.getPropertyValue('--card-bg')), bg);
+    const inner = blendColor(parseCssColor(cs.getPropertyValue('--timer-bg')), card);
+    const text = parseCssColor(hex);
+    return Math.min(contrastRatio(text, bg), contrastRatio(text, card), contrastRatio(text, inner));
+}
+function applyTextColor() {
+    document.body.style.removeProperty('--text-main');
+    const msg = document.getElementById('text-color-msg');
+    const picker = document.getElementById('picker-text-color');
+    if (picker) picker.value = settings.customTextColor || '#' + ['r','g','b'].map(k => Math.round(parseCssColor(getComputedStyle(document.body).getPropertyValue('--text-main'))[k]).toString(16).padStart(2, '0')).join('');
+    if (!settings.customTextColor) { if (msg) { msg.className = 'text-color-msg'; msg.innerText = '目前使用主題預設文字色'; } return; }
+    if (getTextContrast(settings.customTextColor) < MIN_TEXT_CONTRAST) {
+        // 換主題 / 夜間模式後變得看不清楚 → 暫時改用主題預設色，避免畫面看不到字
+        if (msg) { msg.className = 'text-color-msg warn'; msg.innerText = '⚠ 自訂文字色在目前背景下太難辨識，已暫時改用主題預設色'; }
+        return;
+    }
+    document.body.style.setProperty('--text-main', settings.customTextColor, 'important');
+    if (msg) { msg.className = 'text-color-msg'; msg.innerText = '已套用自訂文字色'; }
+}
+async function onTextColorChange() {
+    const picker = document.getElementById('picker-text-color');
+    const color = picker.value;
+    const ratio = getTextContrast(color);
+    if (ratio < MIN_TEXT_CONTRAST) {
+        applyTextColor(); // 還原選色器
+        return await appAlert(`這個顏色與背景太接近（對比 ${ratio.toFixed(1)}，需至少 ${MIN_TEXT_CONTRAST}），套用後文字會看不清楚，請選擇深一點或亮一點的顏色。`, '無法套用此顏色');
+    }
+    settings.customTextColor = color; saveSettings(); applyTextColor();
+}
+function resetTextColor() { settings.customTextColor = null; saveSettings(); applyTextColor(); }
 function toggleAutoNight() { settings.autoNightMode = document.getElementById('auto-night-toggle').checked; saveSettings(); applyNightMode(); }
 function toggleMapSetting() { 
     settings.enableMap = document.getElementById('setting-map-toggle').checked; 
@@ -796,16 +856,28 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 function toDateInputStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
 function fmtCampaignDateTime(ts) { const d = new Date(ts); return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}(${'日一二三四五六'[d.getDay()]}) ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 
-// 活動進度：以訂單完成時間 (timestamp) 落在區間內計算，不含取消單；只取「已達成目標中獎金最高」的一個
+// 訂單接單時間 (計時器開始)：新紀錄直接存有 startTs；舊紀錄由完成時間的日期 + startTimeStr 推回 (跨午夜則退一天)
+function getRecordStartTs(r) {
+    if (r.startTs) return r.startTs;
+    const mins = timeStrToMins(r.startTimeStr);
+    if (mins === null) return r.timestamp;
+    const d = new Date(r.timestamp); d.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+    let ts = d.getTime();
+    if (ts > r.timestamp) ts -= 86400000;
+    return ts;
+}
+
+// 活動進度：以「接單時間」落在區間內計算 (配送超過活動時間仍算)，已取餐取消單正常計入；只取「已達成目標中獎金最高」的一個
 function getCampaignProgress(c) {
-    const count = historyRecords.filter(r => !r.isCancelled && r.timestamp >= c.startTs && r.timestamp <= c.endTs).length;
+    const count = historyRecords.filter(r => { const st = getRecordStartTs(r); return st >= c.startTs && st <= c.endTs; }).length;
+    const pending = activeTimers.filter(t => t.startTime >= c.startTs && t.startTime <= c.endTs).length;
     const tiers = [...c.tiers].sort((a, b) => a.target - b.target);
     let reward = 0, wonTier = null;
     tiers.forEach(t => { if (count >= t.target && (wonTier === null || t.reward >= reward)) { reward = t.reward; wonTier = t; } });
     const nextTier = tiers.find(t => count < t.target && t.reward > reward) || null;
     const now = Date.now();
     const status = now < c.startTs ? 'upcoming' : (now > c.endTs ? 'ended' : 'active');
-    return { count, reward, wonTier, nextTier, status, tiers };
+    return { count, pending, reward, wonTier, nextTier, status, tiers };
 }
 
 // 已結束且有達標的活動 → 轉為收入用的「獎金紀錄」(算在活動結束當天，不計入件數)
@@ -838,6 +910,7 @@ function renderCampaignList() {
         } else {
             progressHtml = `<div class="cp-progress">${p.status === 'ended' ? '最終' : '已'}完成 <b>${p.count}</b> 單 · ${p.status === 'ended' ? '獲得' : '目前'}獎金 <b class="cp-reward">${fmtMoney(p.reward)}</b></div>`;
             if (p.status === 'active' && p.nextTier) progressHtml += `<div class="cp-next">再 ${p.nextTier.target - p.count} 單可達 ${p.nextTier.target} 單（獎金 ${fmtMoney(p.nextTier.reward)}）</div>`;
+            if (p.pending > 0) progressHtml += `<div class="cp-next">另有 ${p.pending} 單配送中，送達後計入</div>`;
             progressHtml += `<div class="cp-bar"><div style="width:${pct}%;"></div></div>`;
         }
         const chips = p.tiers.map(t => {
@@ -972,6 +1045,17 @@ function setMultiplier(v) {
 function onMultiplierRangeInput() { setMultiplier(document.getElementById('multiplier-range').value); }
 function onMultiplierNumberChange() { setMultiplier(document.getElementById('multiplier-input').value); }
 
+/* ================== 設定分頁 ================== */
+let currentSettingsTab = 'general';
+function switchSettingsTab(tab) {
+    currentSettingsTab = tab;
+    document.querySelectorAll('.settings-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+    document.querySelectorAll('.settings-pane').forEach(el => el.style.display = (el.dataset.pane === tab) ? 'block' : 'none');
+    const nameEl = document.getElementById('settings-current-user-name');
+    if (nameEl) nameEl.innerText = currentUser;
+    document.getElementById('view-settings').scrollTop = 0;
+}
+
 /* ================== UI 摺疊互動 ================== */
 function toggleCollapse(header) {
     header.classList.toggle('collapsed');
@@ -1061,9 +1145,8 @@ function renderWeeklyData() {
     document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0) + weeklyBonuses.reduce((sum, b) => sum + b.amount, 0));
     document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(shiftRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs).reduce((s, r) => s + r.durationMins, 0))}`;
     
-    const normalWeeklyRecords = weeklyRecords.filter(r => !r.isCancelled);
-    renderStats(normalWeeklyRecords.concat(weeklyBonuses), 'stats-list'); 
-    renderWeeklyChart('weekly-chart-income', normalWeeklyRecords.concat(weeklyBonuses), 'income');
+    renderStats(weeklyRecords.concat(weeklyBonuses), 'stats-list'); 
+    renderWeeklyChart('weekly-chart-income', weeklyRecords.concat(weeklyBonuses), 'income');
 
     const weeklyTips = tipRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
     document.getElementById('weekly-total-amount-tips').innerText = fmtMoney(weeklyTips.reduce((sum, r) => sum + r.amount, 0));
@@ -1163,6 +1246,7 @@ function switchView(index, isInstant = false, fromPopState = false) {
     
     if([1, 2, 3].includes(index)) { initWeeklyView(); renderWeeklyData(); }
     if(index === 4) { calculatePunctuality(); }
+    if(index === 5) { switchSettingsTab(currentSettingsTab); }
     
     if (index === 0 && document.body.classList.contains('map-enabled') && mapInstance) {
         setTimeout(() => mapInstance.resize(), 350);
@@ -1271,7 +1355,7 @@ function updateUIState() {
     } else { 
         if (currentViewIndex === 0) {
             document.body.classList.add('on-home-view');
-            title.innerHTML = `${currentUser} <span style="font-size: 0.8rem; vertical-align: middle;">▾</span>`;
+            title.innerHTML = `${escapeHtml(currentUser)} <span style="font-size: 0.8rem; vertical-align: middle;">▾</span>`;
             titleWrapper.style.pointerEvents = 'auto'; titleWrapper.style.cursor = 'pointer'; 
             titleWrapper.onclick = () => openUserModal('switch');
             if (activeShift) updateShiftUI();
@@ -1426,7 +1510,7 @@ async function stopTimer(id) {
     const multiplier = getCurrentMultiplier();
     const amount = calcOrderAmount(billableMins, multiplier);
     const endDateObj = new Date(endTime); 
-    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), multiplier: multiplier, timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
+    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), multiplier: multiplier, startTs: timer.startTime, timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
     activeTimers.splice(index, 1); 
     localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); 
     localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
@@ -1461,7 +1545,7 @@ function confirmCancelTimer(action) {
         historyRecords.push({ 
             id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], 
             startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, 
-            amount: Number(amount.toFixed(2)), multiplier: multiplier, timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '',
+            amount: Number(amount.toFixed(2)), multiplier: multiplier, startTs: timer.startTime, timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '',
             isCancelled: true
         }); 
         
@@ -1483,7 +1567,7 @@ function incrementOrderNumber(str) {
 function openStoreModal(id) { document.getElementById('store-target-id').value = id; const kwInput = document.getElementById('store-keyword'); kwInput.value = ''; document.getElementById('store-result-list').innerHTML = ''; document.getElementById('store-modal').classList.add('active'); kwInput.focus(); setTimeout(() => { kwInput.focus(); }, 50); }
 function handleTimerTitleClick(id) { const timer = activeTimers.find(t => t.id === id); if (!timer) return; if (timer.storeName) { document.getElementById('timer-action-title').innerText = timer.storeName; document.getElementById('timer-action-id').value = id; document.getElementById('timer-action-modal').classList.add('active'); } else { openStoreModal(id); } }
 function editOrderNumber() { const id = document.getElementById('timer-action-id').value, timer = activeTimers.find(t => t.id === id); if(timer) { closeModal('timer-action-modal'); openOrderNumberModal('修改單號', timer.orderNumber || '', function(newNum) { timer.orderNumber = newNum; localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); }); } }
-function cloneTimer() { const id = document.getElementById('timer-action-id').value, timer = activeTimers.find(t => t.id === id); if(timer) { closeModal('timer-action-modal'); const nextNum = incrementOrderNumber(timer.orderNumber); openOrderNumberModal(`為【${timer.storeName}】新增訂單`, nextNum, function(orderNum) { const now = Date.now(); activeTimers.push({ id: 'timer_' + now + '_' + Math.random().toString(36).substr(2, 5), startTime: now, storeName: timer.storeName, orderNumber: orderNum }); localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); checkWaitState(); }); } }
+async function cloneTimer() { const id = document.getElementById('timer-action-id').value, timer = activeTimers.find(t => t.id === id); if (!activeShift) { closeModal('timer-action-modal'); return await appAlert('請先點擊「時段開始」進入上線狀態，才能開始接單！'); } if(timer) { closeModal('timer-action-modal'); const nextNum = incrementOrderNumber(timer.orderNumber); openOrderNumberModal(`為【${timer.storeName}】新增訂單`, nextNum, function(orderNum) { const now = Date.now(); activeTimers.push({ id: 'timer_' + now + '_' + Math.random().toString(36).substr(2, 5), startTime: now, storeName: timer.storeName, orderNumber: orderNum }); localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); renderActiveTimers(); checkWaitState(); }); } }
 function rebindTimer() { const id = document.getElementById('timer-action-id').value; closeModal('timer-action-modal'); openStoreModal(id); }
 
 async function addCustomStore() { const kw = document.getElementById('store-keyword').value.trim(); const name = await appPrompt('請輸入新店家名稱：', kw, '新增自訂店家'); if (name && name.trim() !== '') { customStores.push({ code: '自訂', name: name.trim() }); localStorage.setItem('app_custom_stores', JSON.stringify(customStores)); searchStore(); selectStore(name.trim()); } }
@@ -1493,7 +1577,7 @@ function searchStore() {
     if (results.length === 0) return listEl.innerHTML = '<div style="padding:10px; text-align:center; color:var(--text-muted);">無符合的店家，請點擊上方 [新增]</div>';
     results.forEach(s => {
         const div = document.createElement('div'); div.style.padding = '12px'; div.style.borderBottom = '1px solid var(--border)'; div.style.cursor = 'pointer'; div.style.color = 'var(--text-main)';
-        div.innerHTML = `<span style="font-size:0.8rem; background:var(--primary); color:var(--btn-text); padding:2px 6px; border-radius:4px; margin-right:8px; box-shadow:0 1px 2px rgba(0,0,0,0.1);">${s.code}</span><strong>${s.name}</strong>`;
+        div.innerHTML = `<span style="font-size:0.8rem; background:var(--primary); color:var(--btn-text); padding:2px 6px; border-radius:4px; margin-right:8px; box-shadow:0 1px 2px rgba(0,0,0,0.1);">${s.code}</span><strong>${escapeHtml(s.name)}</strong>`;
         div.onclick = () => selectStore(s.name); listEl.appendChild(div);
     });
 }
@@ -1646,7 +1730,7 @@ function renderActiveTimers() {
     let html = '';
     const now = Date.now();
     activeTimers.forEach((timer, idx) => {
-        const titleStr = timer.storeName ? `${timer.storeName} #${timer.orderNumber}` : `訂單計時 #${idx + 1}`;
+        const titleStr = timer.storeName ? `${escapeHtml(timer.storeName)} #${escapeHtml(timer.orderNumber)}` : `訂單計時 #${idx + 1}`;
         
         let estStr = '';
         if (timer.estimatedTime) {
@@ -1713,7 +1797,8 @@ function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amou
 function renderTips(data = tipRecords, containerId = 'tips-list') { renderRecordGroup(data, containerId, '此區間尚無小費紀錄', 'tip', '筆小費'); }
 function renderCosts(data = costRecords, containerId = 'costs-list') { renderRecordGroup(data, containerId, '此區間尚無成本紀錄', 'cost', '筆成本', '支出 ', 'var(--text-main)'); }
 function renderStats(data = historyRecords, containerId = 'stats-list') { 
-    renderRecordGroup(data.filter(r => !r.isCancelled), containerId, '此區間尚無收入紀錄', 'income', '張訂單'); 
+    // 已取餐取消單：單量與金額皆正常計算
+    renderRecordGroup(data, containerId, '此區間尚無收入紀錄', 'income', '張訂單'); 
 }
 
 /* ================== 單日明細 Modal 邏輯 ================== */
@@ -1797,7 +1882,7 @@ function renderDailyDetail() {
 let rangeCalcIsCustom = false; // 使用者是否手動調整過區間 (切換日期時重置)
 function timeStrToMins(str) { if (!str || !str.includes(':')) return null; const [h, m] = str.split(':').map(Number); return (isNaN(h) || isNaN(m)) ? null : h * 60 + m; }
 function getRangeBasis() { const r = document.querySelector('input[name="range-calc-basis"]:checked'); return r ? r.value : 'end'; }
-function getDailyValidOrders() { const dateKey = getDateKey(currentDailyDateObj.getTime()); return historyRecords.filter(r => r.dateKey === dateKey && !r.isCancelled); }
+function getDailyValidOrders() { const dateKey = getDateKey(currentDailyDateObj.getTime()); return historyRecords.filter(r => r.dateKey === dateKey); }
 function getRecordTimeStr(r, basis) { return basis === 'start' ? r.startTimeStr : r.endTimeStr; }
 
 // 預設區間：當日第一單 ～ 最後一單的時間
@@ -1876,7 +1961,7 @@ function renderDailyDetailList() {
             html = `<div class="empty-state">此分類目前無紀錄</div>`;
         } else {
             targetList.forEach(r => {
-                const titleStr = r.storeName ? `<div style="font-weight:bold; color:var(--primary); margin-bottom:4px; font-size:1rem; word-break:break-word;">${r.storeName} #${r.orderNumber}</div>` : '';
+                const titleStr = r.storeName ? `<div style="font-weight:bold; color:var(--primary); margin-bottom:4px; font-size:1rem; word-break:break-word;">${escapeHtml(r.storeName)} #${escapeHtml(r.orderNumber)}</div>` : '';
                 html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount-wrap" onclick="editIncomeAmount('${r.id}')"><div class="record-amount">${fmtMoney(r.amount)}</div>${(r.multiplier && r.multiplier > 1) ? FLAME_SVG : ''}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
             });
         }
@@ -1929,7 +2014,7 @@ function selectCalDate(y, m, d) { const t = new Date(y, m, d, 0, 0, 0).getTime()
 async function applyFilter() { 
     if (!calSelStart) return await appAlert('請先選擇日期', '操作錯誤'); 
     const sTime = calSelStart, eTime = (calSelEnd || calSelStart) + 86399999; 
-    const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime && !r.isCancelled), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
+    const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
     
     document.getElementById('search-total-orders').innerText = fInc.length + '張'; 
     const fBonus = getBonusesBetween(sTime, eTime);
@@ -1949,7 +2034,7 @@ async function applyFilter() {
 
 /* ================== 準時率 / 兩週週期計算邏輯 ================== */
 function getPunctualityStats(records, startMs, endMs, buffer) {
-    const validRecords = records.filter(r => r.estimatedTime && r.estimatedTime > 0 && r.timestamp >= startMs && r.timestamp <= endMs && !r.isCancelled);
+    const validRecords = records.filter(r => r.estimatedTime && r.estimatedTime > 0 && r.timestamp >= startMs && r.timestamp <= endMs);
     if (validRecords.length === 0) return null;
 
     let onTimeCount = 0, singleTimeoutRates = [], totalActual = 0, totalEstimatedWithBuffer = 0;
@@ -2036,6 +2121,15 @@ function calculatePunctuality() {
         document.getElementById('prev-punctuality-total-timeout').innerText = prevStats.totalTimeoutRate.toFixed(1) + '%';
         document.getElementById('prev-punctuality-diff-amount').innerText = fmtMoney(prevStats.diffAmount);
     }
+}
+
+async function clearAllData() {
+    if (!(await appConfirm(`確定要清除使用者 [${currentUser}] 的所有紀錄嗎？\n包含：進行中訂單、收入、小費、成本、上線時段、等單紀錄。\n（外觀設定、倍率與達標活動會保留）\n\n此動作無法復原，建議先匯出備份！`, '清除紀錄', true))) return;
+    if (!(await appConfirm('請再確認一次：真的要清除所有紀錄嗎？', '最後確認', true))) return;
+    ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits'].forEach(k => localStorage.removeItem(getStoreKey(k)));
+    loadData();
+    if (currentViewIndex === 4) calculatePunctuality();
+    await appAlert('已清除當前使用者的所有紀錄。', '完成');
 }
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
