@@ -531,6 +531,26 @@
                 </div>
             </div>
             
+            <!-- 區間試算 (僅收入明細) -->
+            <div class="card range-calc-card" id="daily-range-calc" style="display:none;">
+                <h2 style="margin-bottom: 10px;">區間試算</h2>
+                <div class="range-calc-inputs">
+                    <input type="time" id="range-calc-start" class="form-control" value="11:00" onchange="onRangeCalcChange()">
+                    <span class="range-calc-sep">～</span>
+                    <input type="time" id="range-calc-end" class="form-control" value="14:00" onchange="onRangeCalcChange()">
+                </div>
+                <div class="range-calc-basis">
+                    <label><input type="radio" name="range-calc-basis" value="end" checked onchange="onRangeCalcChange()"> 依完成時間</label>
+                    <label><input type="radio" name="range-calc-basis" value="start" onchange="onRangeCalcChange()"> 依開始時間</label>
+                </div>
+                <div class="range-calc-result">
+                    <div class="range-calc-item"><span>單量</span><strong id="range-calc-count" style="color:var(--primary);">0張</strong></div>
+                    <div class="range-calc-item"><span>金額</span><strong id="range-calc-amount" style="color:var(--success);">$0.00</strong></div>
+                    <div class="range-calc-item"><span>平均每單</span><strong id="range-calc-avg" style="color:var(--text-main);">$0.00</strong></div>
+                </div>
+                <div class="range-calc-note">* 不含取消訂單</div>
+            </div>
+
             <div id="daily-detail-tabs" style="display:none; margin: 15px 0; border-bottom: 2px solid var(--border);">
                 <div style="display: flex;">
                     <div id="tab-normal" class="detail-tab active" onclick="switchDailyTab('normal')">件數明細 (0)</div>
@@ -651,19 +671,31 @@
     
     <!-- 耳機選單 Modal (之後可在此持續擴充其他功能) -->
     <div class="modal-overlay" id="headset-modal" onclick="if(event.target === this) closeModal('headset-modal')">
-        <div class="modal-content" style="max-width: 360px; padding: 25px 20px;">
-            <h2 style="margin-bottom: 15px; text-align: center; color: var(--primary);">耳機選單</h2>
-
-            <div class="headset-section">
-                <div class="headset-section-title">倍率調整</div>
-                <div class="multiplier-row">
-                    <input type="range" id="multiplier-range" min="1" max="5" step="0.01" value="1" oninput="onMultiplierRangeInput()">
-                    <input type="number" inputmode="decimal" id="multiplier-input" class="form-control multiplier-input" min="1" max="5" step="0.01" value="1.00" onchange="onMultiplierNumberChange()" onblur="onMultiplierNumberChange()" autocomplete="off" autocorrect="off" spellcheck="false">
-                </div>
-                <div class="multiplier-hint">結算金額 × 倍率（範圍 1.00 – 5.00）</div>
+        <div class="modal-content headset-modal-content">
+            <div class="headset-modal-header">
+                <h2>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                    耳機選單
+                </h2>
+                <button class="headset-close" onclick="closeModal('headset-modal')" aria-label="關閉">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
+                </button>
             </div>
 
-            <button class="btn btn-outline" style="margin-top: 18px;" onclick="closeModal('headset-modal')">關閉</button>
+            <div class="headset-section-title">倍率調整</div>
+            <div class="multiplier-row">
+                <div class="multiplier-slider-wrap">
+                    <input type="range" id="multiplier-range" class="multiplier-range" min="1" max="5" step="0.01" value="1" oninput="onMultiplierRangeInput()">
+                    <div class="multiplier-scale"><span>1.00</span><span>5.00</span></div>
+                </div>
+                <input type="number" inputmode="decimal" id="multiplier-input" class="multiplier-input" min="1" max="5" step="0.01" value="1.00" onchange="onMultiplierNumberChange()" onblur="onMultiplierNumberChange()" onkeydown="if(event.key==='Enter') this.blur()" autocomplete="off" autocorrect="off" spellcheck="false">
+            </div>
+
+            <div class="multiplier-preview" id="multiplier-preview">最低金額試算：$45 × 1.00 = $45.00</div>
+
+            <button class="btn btn-outline multiplier-reset" onclick="setMultiplier(1)">重設為 1.00</button>
+
+            <p class="multiplier-note">* 設定後，之後結算的訂單金額皆乘上此倍率；已結算的紀錄不受影響。</p>
         </div>
     </div>
 
