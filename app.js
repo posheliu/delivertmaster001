@@ -823,6 +823,7 @@ function toggleConfirmDelivery() { settings.confirmDelivery = document.getElemen
 /* ================== 耳機選單 / 倍率調整 ================== */
 let currentHeadsetPane = 'menu';
 function openHeadsetModal() {
+    campaignEditMode = false; document.getElementById('cp-edit-mode').checked = false; currentCampaignTab = 'active';
     showHeadsetPane('menu');
     document.getElementById('headset-modal').classList.add('active');
 }
@@ -849,6 +850,8 @@ function renderHeadsetMenu() {
 
 /* ================== 達標活動 ================== */
 let editingCampaignId = null;
+let campaignEditMode = false; // 開啟後才顯示 編輯 / 複製使用 / 刪除
+function toggleCampaignEditMode() { campaignEditMode = document.getElementById('cp-edit-mode').checked; renderCampaignList(); }
 const TROPHY_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg>`;
 function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function saveCampaigns() { localStorage.setItem(getStoreKey('order_campaigns'), JSON.stringify(campaigns)); }
@@ -893,17 +896,42 @@ function getCampaignBonusRecords() {
 }
 function getBonusesBetween(startTs, endTs) { return getCampaignBonusRecords().filter(b => b.timestamp >= startTs && b.timestamp <= endTs); }
 
+let currentCampaignTab = 'active';
+const campaignExpanded = {}; // id → 是否展開；未設定時預設只展開「進行中」
+function switchCampaignTab(tab) { currentCampaignTab = tab; renderCampaignList(); }
+function toggleCampaignCard(id) {
+    const card = document.querySelector(`.cp-card[data-id="${id}"]`); if (!card) return;
+    const willExpand = card.classList.contains('collapsed');
+    campaignExpanded[id] = willExpand;
+    card.classList.toggle('collapsed', !willExpand);
+}
+
 function renderCampaignList() {
     const el = document.getElementById('campaign-list');
-    if (campaigns.length === 0) { el.innerHTML = '<div class="empty-state">尚未建立達標活動</div>'; return; }
-    const order = { active: 0, upcoming: 1, ended: 2 };
-    const items = campaigns.map(c => ({ c, p: getCampaignProgress(c) }))
-        .sort((x, y) => (order[x.p.status] - order[y.p.status]) || (x.p.status === 'ended' ? y.c.endTs - x.c.endTs : x.c.startTs - y.c.startTs));
+    const items = campaigns.map(c => ({ c, p: getCampaignProgress(c) }));
+    const groups = { active: [], upcoming: [], ended: [] };
+    items.forEach(x => groups[x.p.status].push(x));
+    groups.active.sort((x, y) => x.c.endTs - y.c.endTs);      // 快結束的在前
+    groups.upcoming.sort((x, y) => x.c.startTs - y.c.startTs); // 快開始的在前
+    groups.ended.sort((x, y) => y.c.endTs - x.c.endTs);        // 最近結束的在前
+    ['active', 'upcoming', 'ended'].forEach(k => { document.getElementById('cp-tab-count-' + k).innerText = groups[k].length ? `(${groups[k].length})` : ''; });
+    document.querySelectorAll('.cp-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === currentCampaignTab));
+
+    const list = groups[currentCampaignTab];
+    const emptyText = { active: '目前沒有進行中的活動', upcoming: '沒有尚未開始的活動', ended: '尚無過往活動紀錄' }[currentCampaignTab];
+    if (list.length === 0) { el.innerHTML = `<div class="empty-state">${emptyText}</div>`; return; }
+
     let html = '';
-    items.forEach(({ c, p }) => {
+    list.forEach(({ c, p }) => {
         const statusText = { active: '進行中', upcoming: '未開始', ended: '已結束' }[p.status];
+        const expanded = campaignExpanded[c.id] !== undefined ? campaignExpanded[c.id] : (p.status === 'active');
         const maxTarget = p.tiers.length ? p.tiers[p.tiers.length - 1].target : 1;
         const pct = Math.min(100, (p.count / maxTarget) * 100);
+        let summary;
+        if (p.status === 'upcoming') summary = `${fmtCampaignDateTime(c.startTs)} 開始`;
+        else if (p.status === 'active') summary = `已完成 ${p.count} 單 · 目前 <b>${fmtMoney(p.reward)}</b>`;
+        else summary = `完成 ${p.count} 單 · 獲得 <b>${fmtMoney(p.reward)}</b>`;
+
         let progressHtml = '';
         if (p.status === 'upcoming') {
             progressHtml = `<div class="cp-progress">尚未開始</div>`;
@@ -917,17 +945,24 @@ function renderCampaignList() {
             const cls = (p.wonTier && t === p.wonTier) ? 'won' : (p.count >= t.target && p.status !== 'upcoming' ? 'done' : '');
             return `<span class="cp-chip ${cls}">${t.target}單 ${fmtMoney(t.reward)}</span>`;
         }).join('');
-        html += `<div class="cp-card">
-            <div class="cp-card-head"><div class="cp-card-title">${escapeHtml(c.title)}</div><span class="cp-status ${p.status}">${statusText}</span></div>
-            ${c.content ? `<div class="cp-card-content">${escapeHtml(c.content)}</div>` : ''}
-            <div class="cp-card-period">${fmtCampaignDateTime(c.startTs)} ～<br>${fmtCampaignDateTime(c.endTs)}</div>
-            ${progressHtml}
-            <div class="cp-tier-chips">${chips}</div>
-            <div class="cp-actions">
+        const actions = campaignEditMode ? `<div class="cp-actions">
                 <button class="btn btn-outline" onclick="openCampaignEditor('${c.id}')">編輯</button>
                 <button class="btn btn-outline" onclick="openCampaignEditor(null, '${c.id}')">複製使用</button>
                 <button class="btn btn-outline cp-del" onclick="deleteCampaign('${c.id}')">刪除</button>
+            </div>` : '';
+
+        html += `<div class="cp-card ${expanded ? '' : 'collapsed'}" data-id="${c.id}">
+            <div class="cp-card-head" onclick="toggleCampaignCard('${c.id}')">
+                <div class="cp-head-main"><div class="cp-card-title">${escapeHtml(c.title)}</div><div class="cp-card-summary">${summary}</div></div>
+                <div class="cp-head-right"><span class="cp-status ${p.status}">${statusText}</span><span class="cp-chevron">▾</span></div>
             </div>
+            <div class="cp-body-wrap"><div class="cp-body"><div class="cp-body-inner">
+                ${c.content ? `<div class="cp-card-content">${escapeHtml(c.content)}</div>` : ''}
+                <div class="cp-card-period">${fmtCampaignDateTime(c.startTs)} ～<br>${fmtCampaignDateTime(c.endTs)}</div>
+                ${progressHtml}
+                <div class="cp-tier-chips">${chips}</div>
+                ${actions}
+            </div></div></div>
         </div>`;
     });
     el.innerHTML = html;
@@ -1002,12 +1037,16 @@ function saveCampaign() {
     if (!title) { const d = new Date(startTs); title = `達標活動 ${d.getMonth() + 1}/${d.getDate()}`; }
     const data = { title, content: document.getElementById('cp-content').value.trim(), startDate: sd, startTime: st, endDate: ed, endTime: et, startTs, endTs, tiers };
 
+    let savedId = editingCampaignId;
     if (editingCampaignId) {
         const idx = campaigns.findIndex(c => c.id === editingCampaignId);
         if (idx > -1) campaigns[idx] = { ...campaigns[idx], ...data };
     } else {
-        campaigns.push({ id: 'cp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), createdAt: Date.now(), ...data });
+        savedId = 'cp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+        campaigns.push({ id: savedId, createdAt: Date.now(), ...data });
     }
+    const savedCampaign = campaigns.find(c => c.id === savedId);
+    if (savedCampaign) { currentCampaignTab = getCampaignProgress(savedCampaign).status; campaignExpanded[savedId] = true; }
     saveCampaigns();
     editingCampaignId = null;
     refreshIncomeViews();
