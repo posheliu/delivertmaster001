@@ -763,8 +763,19 @@
 
             <!-- 達標活動列表 -->
             <div id="headset-pane-campaigns" class="headset-pane" style="display:none;">
-                <button class="btn" onclick="openCampaignEditor()">＋ 新增達標活動</button>
-                <div id="campaign-list" style="margin-top: 14px;"></div>
+                <div class="cp-toolbar">
+                    <button class="btn cp-add-btn" onclick="openCampaignEditor()">＋ 新增活動</button>
+                    <label class="cp-edit-toggle">
+                        <span>編輯模式</span>
+                        <span class="switch"><input type="checkbox" id="cp-edit-mode" onchange="toggleCampaignEditMode()"><span class="slider"></span></span>
+                    </label>
+                </div>
+                <div class="cp-tabs">
+                    <div class="cp-tab active" data-tab="active" onclick="switchCampaignTab('active')">進行中 <span id="cp-tab-count-active"></span></div>
+                    <div class="cp-tab" data-tab="upcoming" onclick="switchCampaignTab('upcoming')">尚未開始 <span id="cp-tab-count-upcoming"></span></div>
+                    <div class="cp-tab" data-tab="ended" onclick="switchCampaignTab('ended')">過往紀錄 <span id="cp-tab-count-ended"></span></div>
+                </div>
+                <div id="campaign-list"></div>
                 <p class="multiplier-note">* 以「接單時間」（計時器開始）計算是否落在活動區間內，配送超過活動時間仍算在內；已取餐的取消單也正常計入。<br>* 只會獲得一個達標獎金（取已達成目標中最高的獎金），活動結束後自動計入結束當天的收入。</p>
             </div>
 
