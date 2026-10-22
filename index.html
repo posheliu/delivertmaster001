@@ -156,7 +156,7 @@
                 <div class="collapsible-wrap">
                     <div class="collapsible-content">
                         <div style="margin-top: 15px;">
-                            <div class="input-group"><label>金額</label><input type="number" inputmode="numeric" id="tip-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+                            <div class="input-group"><label>金額</label><input type="number" inputmode="decimal" step="any" id="tip-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                             <div class="input-group"><label>支付方式</label><select id="tip-method" class="form-control"><option value="現金">現金</option><option value="刷卡">刷卡</option></select></div>
                             <button class="btn" onclick="saveTip()">記錄小費</button>
                         </div>
@@ -194,7 +194,7 @@
                 <div class="collapsible-wrap">
                     <div class="collapsible-content">
                         <div style="margin-top: 15px;">
-                            <div class="input-group"><label>金額</label><input type="number" inputmode="numeric" id="cost-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+                            <div class="input-group"><label>金額</label><input type="number" inputmode="decimal" step="any" id="cost-amount" class="form-control" placeholder="輸入金額" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                             <div class="input-group"><label>類別</label><select id="cost-type" class="form-control" onchange="toggleMileageInput()"><option value="加油">加油</option><option value="保養維修">保養維修</option><option value="周邊設備">周邊設備</option></select></div>
                             <div class="input-group" id="mileage-group"><label>里程數 (選填)</label><input type="number" inputmode="numeric" id="cost-mileage" class="form-control" placeholder="輸入當前里程數" autocomplete="off" autocorrect="off" spellcheck="false"></div>
                             <div class="input-group"><label>備註 (選填)</label><input type="text" id="cost-memo" class="form-control" placeholder="" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></div>
@@ -531,24 +531,32 @@
                 </div>
             </div>
             
-            <!-- 區間試算 (僅收入明細) -->
+            <!-- 區間試算 (僅收入明細，可摺疊) -->
             <div class="card range-calc-card" id="daily-range-calc" style="display:none;">
-                <h2 style="margin-bottom: 10px;">區間試算</h2>
-                <div class="range-calc-inputs">
-                    <input type="time" id="range-calc-start" class="form-control" value="11:00" onchange="onRangeCalcChange()">
-                    <span class="range-calc-sep">～</span>
-                    <input type="time" id="range-calc-end" class="form-control" value="14:00" onchange="onRangeCalcChange()">
+                <h2 class="collapsible-header" onclick="toggleCollapse(this)">區間試算</h2>
+                <div class="collapsible-wrap">
+                    <div class="collapsible-content">
+                        <div style="margin-top: 15px;">
+                            <div class="range-calc-inputs">
+                                <input type="time" id="range-calc-start" class="form-control" onchange="onRangeCalcChange()">
+                                <span class="range-calc-sep">～</span>
+                                <input type="time" id="range-calc-end" class="form-control" onchange="onRangeCalcChange()">
+                            </div>
+                            <div class="range-calc-basis">
+                                <label><input type="radio" name="range-calc-basis" value="end" checked onchange="onRangeBasisChange()"> 依完成時間</label>
+                                <label><input type="radio" name="range-calc-basis" value="start" onchange="onRangeBasisChange()"> 依開始時間</label>
+                            </div>
+                            <div class="range-calc-error" id="range-calc-error" style="display:none;"></div>
+                            <div class="range-calc-result">
+                                <div class="range-calc-item"><span>單量</span><strong id="range-calc-count" style="color:var(--primary);">0張</strong></div>
+                                <div class="range-calc-item"><span>金額</span><strong id="range-calc-amount" style="color:var(--success);">$0.00</strong></div>
+                                <div class="range-calc-item"><span>平均每單</span><strong id="range-calc-avg" style="color:var(--text-main);">$0.00</strong></div>
+                            </div>
+                            <button class="btn btn-outline range-calc-reset" onclick="resetRangeCalc()">清除區間（恢復預設）</button>
+                            <div class="range-calc-note">* 預設為當日第一單 ～ 最後一單的時間，不含取消訂單</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="range-calc-basis">
-                    <label><input type="radio" name="range-calc-basis" value="end" checked onchange="onRangeCalcChange()"> 依完成時間</label>
-                    <label><input type="radio" name="range-calc-basis" value="start" onchange="onRangeCalcChange()"> 依開始時間</label>
-                </div>
-                <div class="range-calc-result">
-                    <div class="range-calc-item"><span>單量</span><strong id="range-calc-count" style="color:var(--primary);">0張</strong></div>
-                    <div class="range-calc-item"><span>金額</span><strong id="range-calc-amount" style="color:var(--success);">$0.00</strong></div>
-                    <div class="range-calc-item"><span>平均每單</span><strong id="range-calc-avg" style="color:var(--text-main);">$0.00</strong></div>
-                </div>
-                <div class="range-calc-note">* 不含取消訂單</div>
             </div>
 
             <div id="daily-detail-tabs" style="display:none; margin: 15px 0; border-bottom: 2px solid var(--border);">
@@ -658,7 +666,7 @@
         <div class="modal-content">
             <h2 id="edit-modal-title" style="margin-bottom: 15px;">編輯紀錄</h2>
             <input type="hidden" id="edit-id"><input type="hidden" id="edit-category">
-            <div class="input-group"><label>金額</label><input type="number" inputmode="numeric" id="edit-amount" class="form-control" autocomplete="off" autocorrect="off" spellcheck="false"></div>
+            <div class="input-group"><label>金額</label><input type="number" inputmode="decimal" step="any" id="edit-amount" class="form-control" autocomplete="off" autocorrect="off" spellcheck="false"></div>
             <div class="input-group" id="edit-tip-fields" style="display:none;"><label>支付方式</label><select id="edit-tip-method" class="form-control"><option value="現金">現金</option><option value="刷卡">刷卡</option></select></div>
             <div id="edit-cost-fields" style="display:none;">
                 <div class="input-group"><label>類別</label><select id="edit-cost-type" class="form-control" onchange="toggleEditMileage()"><option value="加油">加油</option><option value="保養維修">保養維修</option><option value="周邊設備">周邊設備</option></select></div>
