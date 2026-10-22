@@ -570,12 +570,46 @@ body.map-enabled.on-home-view #btn-headset-right {
     transition: opacity 0.2s;
 }
 
-.headset-section { background: var(--timer-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
-.headset-section-title { font-weight: bold; color: var(--text-main); margin-bottom: 12px; }
-.multiplier-row { display: flex; align-items: center; gap: 12px; }
-.multiplier-row input[type="range"] { flex: 1; accent-color: var(--primary); height: 28px; }
-.multiplier-input { width: 84px !important; flex-shrink: 0; text-align: center; font-weight: bold; padding: 8px !important; }
-.multiplier-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; }
+/* 耳機選單 Modal */
+.headset-modal-content { max-width: 360px; padding: 22px 20px 20px; }
+.headset-modal-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+.headset-modal-header h2 { display: flex; align-items: center; gap: 8px; font-size: 1.25rem; color: var(--primary); margin: 0; }
+.headset-modal-header h2 svg { display: block; flex-shrink: 0; }
+.headset-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 8px; transition: background 0.2s; }
+.headset-close:active { background: var(--timer-bg); }
+.headset-section-title { font-weight: bold; font-size: 1.05rem; color: var(--text-main); margin-bottom: 12px; }
+
+.multiplier-row { display: flex; align-items: flex-start; gap: 14px; }
+.multiplier-slider-wrap { flex: 1; min-width: 0; padding-top: 14px; }
+.multiplier-scale { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
+
+/* 自訂滑桿：左側已選段填入主題色 */
+.multiplier-range { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px; outline: none; cursor: pointer; margin: 0;
+    background: linear-gradient(to right, var(--primary) 0%, var(--primary) var(--fill, 0%), rgba(0,0,0,0.1) var(--fill, 0%), rgba(0,0,0,0.1) 100%); }
+body.night-mode .multiplier-range { background: linear-gradient(to right, var(--primary) 0%, var(--primary) var(--fill, 0%), rgba(255,255,255,0.15) var(--fill, 0%), rgba(255,255,255,0.15) 100%); }
+.multiplier-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; }
+.multiplier-range::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--primary); border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; }
+
+.multiplier-input { width: 96px; height: 50px; flex-shrink: 0; text-align: center; font-size: 1.35rem; font-weight: bold; color: var(--text-main); background: var(--timer-bg); border: 1px solid var(--border); border-radius: 10px; outline: none; -moz-appearance: textfield; }
+.multiplier-input::-webkit-outer-spin-button, .multiplier-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.multiplier-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 117, 151, 0.15); }
+
+.multiplier-preview { margin-top: 18px; padding: 12px; text-align: center; font-size: 0.95rem; color: var(--text-main); background: var(--timer-bg); border: 1px dashed var(--border); border-radius: 10px; }
+.multiplier-reset { margin-top: 14px; padding: 13px; font-size: 1.05rem; font-weight: bold; border-radius: 12px; }
+.multiplier-note { margin-top: 14px; font-size: 0.8rem; line-height: 1.6; color: var(--text-muted); }
+
+/* 單日明細：區間試算 */
+.range-calc-card { padding: 16px; }
+.range-calc-inputs { display: flex; align-items: center; gap: 8px; }
+.range-calc-inputs .form-control { flex: 1; min-width: 0; text-align: center; padding: 10px; }
+.range-calc-sep { color: var(--text-muted); flex-shrink: 0; }
+.range-calc-basis { display: flex; gap: 16px; justify-content: center; margin-top: 10px; font-size: 0.85rem; color: var(--text-muted); }
+.range-calc-basis label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.range-calc-basis input { accent-color: var(--primary); }
+.range-calc-result { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); text-align: center; }
+.range-calc-item span { font-size: 0.8rem; color: var(--text-muted); }
+.range-calc-item strong { display: block; font-size: 1.15rem; margin-top: 4px; }
+.range-calc-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 10px; text-align: right; }
 
 /* 單筆結算卡片：金額下方火焰 */
 .record-amount-wrap { display: flex; flex-direction: column; align-items: center; margin-right: 10px; cursor: pointer; }
