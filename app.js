@@ -60,6 +60,17 @@ function formatMins(mins) { const h = Math.floor(mins / 60), m = Math.floor(mins
 function fmtMoney(num) { return '$' + Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } 
 function fmtNum(num) { return Number(num).toLocaleString('en-US'); }
 
+/* ================== 倍率與金額計算 ================== */
+const FLAME_SVG = `<svg class="boost-flame" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c1.3 3.2 6 5.8 6 11.2a6 6 0 0 1-12 0c0-2.7 1.4-4.6 2.8-5.8.1 1.7.9 2.9 2 3.4C10.4 8.4 10.9 5.2 12 2.5z"/><path d="M12 14c1 1.2 2.1 2.1 2.1 3.4a2.1 2.1 0 0 1-4.2 0c0-1.3 1.1-2.2 2.1-3.4z"/></svg>`;
+function clampMultiplier(v) { let n = parseFloat(v); if (isNaN(n)) n = 1; n = Math.min(5, Math.max(1, n)); return Math.round(n * 100) / 100; }
+function getCurrentMultiplier() { return clampMultiplier(settings.multiplier); }
+// 基本金額 (含最低保障) × 倍率
+function calcOrderAmount(billableMins, multiplier = 1) {
+    let base = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
+    if (base < MIN_AMOUNT) base = MIN_AMOUNT;
+    return Math.round(base * clampMultiplier(multiplier) * 100) / 100;
+}
+
 /* ================== 動態注入新功能 CSS ================== */
 function injectNewStyles() {
     if (document.getElementById('injected-new-styles')) return;
@@ -244,6 +255,7 @@ function loadSettingsForCurrentUser() {
     if(settings.customCardEnable === undefined) settings.customCardEnable = false; if(settings.customCardBg === undefined) settings.customCardBg = '#ffffff'; if(settings.customCardOpacity === undefined) settings.customCardOpacity = 85;
     if(settings.enableMap === undefined) settings.enableMap = true; 
     if(settings.confirmDelivery === undefined) settings.confirmDelivery = false; 
+    settings.multiplier = clampMultiplier(settings.multiplier === undefined ? 1 : settings.multiplier);
 }
 
 window.onload = function() {
@@ -506,7 +518,8 @@ window.updatePanelOpacity = function() {
     const els = [
         document.getElementById('btn-menu'),
         document.getElementById('header-title-wrapper'),
-        document.getElementById('btn-recenter')
+        document.getElementById('btn-recenter'),
+        document.getElementById('btn-headset-right')
     ];
     
     els.forEach(el => {
@@ -742,6 +755,23 @@ function toggleMapSetting() {
     updateShiftUI(); 
 }
 function toggleConfirmDelivery() { settings.confirmDelivery = document.getElementById('setting-confirm-delivery').checked; saveSettings(); applySettings(); }
+
+/* ================== 耳機選單 / 倍率調整 ================== */
+function openHeadsetModal() {
+    const m = getCurrentMultiplier();
+    document.getElementById('multiplier-range').value = m;
+    document.getElementById('multiplier-input').value = m.toFixed(2);
+    document.getElementById('headset-modal').classList.add('active');
+}
+function setMultiplier(v) {
+    const m = clampMultiplier(v);
+    settings.multiplier = m;
+    saveSettings();
+    document.getElementById('multiplier-range').value = m;
+    document.getElementById('multiplier-input').value = m.toFixed(2);
+}
+function onMultiplierRangeInput() { setMultiplier(document.getElementById('multiplier-range').value); }
+function onMultiplierNumberChange() { setMultiplier(document.getElementById('multiplier-input').value); }
 
 /* ================== UI 摺疊互動 ================== */
 function toggleCollapse(header) {
@@ -1020,6 +1050,14 @@ function updateUIState() {
     if (btnMenu) { btnMenu.style.opacity = ''; btnMenu.style.pointerEvents = ''; }
     if (titleWrapper) { titleWrapper.style.opacity = ''; titleWrapper.style.pointerEvents = ''; }
     if (btnRecenter) { btnRecenter.style.opacity = ''; btnRecenter.style.pointerEvents = ''; }
+    const headsetLeft = document.getElementById('btn-headset-left');
+    const headsetRight = document.getElementById('btn-headset-right');
+    if (headsetRight) { headsetRight.style.opacity = ''; headsetRight.style.pointerEvents = ''; }
+    const isOverlayView = isSearchResultOpen || document.getElementById('view-daily-detail').classList.contains('active');
+    const showHeadset = !isOverlayView && currentViewIndex === 0;
+    const mapOn = document.body.classList.contains('map-enabled');
+    if (headsetLeft) headsetLeft.style.display = (showHeadset && !mapOn) ? 'flex' : 'none';
+    if (headsetRight) headsetRight.style.display = (showHeadset && mapOn) ? 'flex' : 'none';
 
     if (isSearchResultOpen || document.getElementById('view-daily-detail').classList.contains('active')) { 
         document.body.classList.remove('on-home-view');
@@ -1184,10 +1222,10 @@ async function stopTimer(id) {
     const index = activeTimers.findIndex(t => t.id === id); if (index === -1) return; 
     const timer = activeTimers[index], endTime = Date.now(), diffMins = Math.max(1, Math.round((endTime - timer.startTime) / 60000)); 
     const billableMins = Math.max(diffMins, timer.estimatedTime || 0);
-    let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
-    if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+    const multiplier = getCurrentMultiplier();
+    const amount = calcOrderAmount(billableMins, multiplier);
     const endDateObj = new Date(endTime); 
-    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
+    historyRecords.push({ id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, amount: Number(amount.toFixed(2)), multiplier: multiplier, timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '' }); 
     activeTimers.splice(index, 1); 
     localStorage.setItem(getStoreKey('order_active_timers'), JSON.stringify(activeTimers)); 
     localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
@@ -1215,14 +1253,14 @@ function confirmCancelTimer(action) {
     } else if (action === 'picked') {
         const timer = activeTimers[index], endTime = Date.now(), diffMins = Math.max(1, Math.round((endTime - timer.startTime) / 60000)); 
         const billableMins = Math.max(diffMins, timer.estimatedTime || 0);
-        let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
-        if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+        const multiplier = getCurrentMultiplier();
+        const amount = calcOrderAmount(billableMins, multiplier);
         const endDateObj = new Date(endTime); 
         
         historyRecords.push({ 
             id: timer.id, dateKey: getDateKey(endTime), year: endDateObj.getFullYear(), month: endDateObj.getMonth() + 1, day: endDateObj.getDate(), dayOfWeek: DAYS_MAP[endDateObj.getDay()], 
             startTimeStr: formatTime(new Date(timer.startTime)), endTimeStr: formatTime(endDateObj), durationMins: diffMins, estimatedTime: timer.estimatedTime || 0, 
-            amount: Number(amount.toFixed(2)), timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '',
+            amount: Number(amount.toFixed(2)), multiplier: multiplier, timestamp: endTime, storeName: timer.storeName || '', orderNumber: timer.orderNumber || '',
             isCancelled: true
         }); 
         
@@ -1281,8 +1319,7 @@ async function editHistoryEstimatedTime(id) {
         if (!isNaN(num) && num >= 0) { 
             record.estimatedTime = num; 
             const billableMins = Math.max(record.durationMins, num); 
-            let amount = Math.ceil(((billableMins / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
-            if (amount < MIN_AMOUNT) amount = MIN_AMOUNT; 
+            const amount = calcOrderAmount(billableMins, record.multiplier || 1);
             record.amount = Number(amount.toFixed(2)); 
             localStorage.setItem(getStoreKey('order_history_records'), JSON.stringify(historyRecords)); 
             renderWeeklyData(); 
@@ -1570,7 +1607,7 @@ function renderDailyDetailList() {
         } else {
             targetList.forEach(r => {
                 const titleStr = r.storeName ? `<div style="font-weight:bold; color:var(--primary); margin-bottom:4px; font-size:1rem; word-break:break-word;">${r.storeName} #${r.orderNumber}</div>` : '';
-                html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
+                html += `<div class="swipe-container record-swipe-container" data-id="${r.id}"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" style="background:var(--success);" onclick="editHistoryEstimatedTime('${r.id}')">預估</div><div class="record-info" onclick="editIncomeAmount('${r.id}')" style="cursor:pointer;">${titleStr}<div class="record-time" style="color:var(--text-main);">${r.startTimeStr} - ${r.endTimeStr}</div><div class="record-desc" style="color:var(--text-muted);">實際 ${r.durationMins} 分鐘 ${r.estimatedTime ? ` / 預估 ${r.estimatedTime} 分鐘` : ''}</div></div><div class="record-amount-wrap" onclick="editIncomeAmount('${r.id}')"><div class="record-amount">${fmtMoney(r.amount)}</div>${(r.multiplier && r.multiplier > 1) ? FLAME_SVG : ''}</div><div class="swipe-delete" onclick="deleteHistoryRecord('${r.id}')">刪除</div></div></div>`;
             });
         }
     } else if (currentDailyContext === 'tip') {
@@ -1653,9 +1690,7 @@ function getPunctualityStats(records, startMs, endMs, buffer) {
         totalActual += actual; totalEstimatedWithBuffer += limit;
         
         totalActualAmount += r.amount;
-        let estAmt = Math.ceil(((r.estimatedTime / 60) * RATE_PER_HOUR) * 100 + 0.0001) / 100;
-        if (estAmt < MIN_AMOUNT) estAmt = MIN_AMOUNT;
-        totalEstimatedAmount += Number(estAmt);
+        totalEstimatedAmount += calcOrderAmount(r.estimatedTime, r.multiplier || 1);
     });
 
     const onTimeRate = (onTimeCount / validRecords.length) * 100;
@@ -1732,4 +1767,4 @@ function calculatePunctuality() {
 }
 
 function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
-function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || key.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
+function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || k.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
