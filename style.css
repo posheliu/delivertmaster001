@@ -553,3 +553,33 @@ body:not(.map-enabled) .map-btn-recenter {
 /* 確保 Leaflet 控制項不會蓋到 Header */
 .leaflet-top, .leaflet-bottom { z-index: 9 !important; }
 .leaflet-control-container .leaflet-top { top: 70px; }
+/* ==============================================================
+   🎧 耳機按鈕 / 倍率調整 / 🔥 倍率火焰圖示
+   ============================================================== */
+.btn-headset { display: flex; align-items: center; justify-content: center; margin: 0; padding: 4px; }
+
+/* 滿版地圖首頁：右上角白色圓鈕 (與左上選單鈕同款) */
+body.map-enabled.on-home-view #btn-headset-right {
+    background: var(--card-bg) !important;
+    border-radius: 50% !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    pointer-events: auto !important;
+    transition: opacity 0.2s;
+}
+
+.headset-section { background: var(--timer-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
+.headset-section-title { font-weight: bold; color: var(--text-main); margin-bottom: 12px; }
+.multiplier-row { display: flex; align-items: center; gap: 12px; }
+.multiplier-row input[type="range"] { flex: 1; accent-color: var(--primary); height: 28px; }
+.multiplier-input { width: 84px !important; flex-shrink: 0; text-align: center; font-weight: bold; padding: 8px !important; }
+.multiplier-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 8px; }
+
+/* 單筆結算卡片：金額下方火焰 */
+.record-amount-wrap { display: flex; flex-direction: column; align-items: center; margin-right: 10px; cursor: pointer; }
+.record-amount-wrap .record-amount { margin-right: 0; }
+.boost-flame { width: 18px; height: 18px; margin-top: 4px; display: block; }
+.boost-flame path { fill: none; stroke: #e8590c; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+body.night-mode .boost-flame path { stroke: #fb923c; }
