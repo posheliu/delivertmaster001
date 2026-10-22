@@ -677,33 +677,87 @@
         </div>
     </div>
     
-    <!-- 耳機選單 Modal (之後可在此持續擴充其他功能) -->
+    <!-- 耳機選單 Modal (主選單 → 倍率設定 / 達標活動，之後可持續擴充) -->
     <div class="modal-overlay" id="headset-modal" onclick="if(event.target === this) closeModal('headset-modal')">
-        <div class="modal-content headset-modal-content">
+        <div class="modal-content headset-modal-content" id="headset-modal-content">
             <div class="headset-modal-header">
                 <h2>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-                    耳機選單
+                    <button class="headset-back" id="headset-back" onclick="headsetBack()" aria-label="返回" style="display:none;">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <svg id="headset-title-icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                    <span id="headset-title-text">耳機選單</span>
                 </h2>
                 <button class="headset-close" onclick="closeModal('headset-modal')" aria-label="關閉">
                     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg>
                 </button>
             </div>
 
-            <div class="headset-section-title">倍率調整</div>
-            <div class="multiplier-row">
-                <div class="multiplier-slider-wrap">
-                    <input type="range" id="multiplier-range" class="multiplier-range" min="1" max="5" step="0.01" value="1" oninput="onMultiplierRangeInput()">
-                    <div class="multiplier-scale"><span>1.00</span><span>5.00</span></div>
-                </div>
-                <input type="number" inputmode="decimal" id="multiplier-input" class="multiplier-input" min="1" max="5" step="0.01" value="1.00" onchange="onMultiplierNumberChange()" onblur="onMultiplierNumberChange()" onkeydown="if(event.key==='Enter') this.blur()" autocomplete="off" autocorrect="off" spellcheck="false">
+            <!-- 主選單 -->
+            <div id="headset-pane-menu" class="headset-pane">
+                <button class="headset-menu-btn" onclick="showHeadsetPane('multiplier')">
+                    <span class="headset-menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/><circle cx="12" cy="14" r="1.2" fill="currentColor"/></svg></span>
+                    <span class="headset-menu-text"><strong>倍率設定</strong><small id="headset-menu-multiplier-sub">目前倍率 ×1.00</small></span>
+                    <span class="headset-menu-arrow">›</span>
+                </button>
+                <button class="headset-menu-btn" onclick="showHeadsetPane('campaigns')">
+                    <span class="headset-menu-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg></span>
+                    <span class="headset-menu-text"><strong>達標活動</strong><small id="headset-menu-campaign-sub">尚無進行中活動</small></span>
+                    <span class="headset-menu-arrow">›</span>
+                </button>
             </div>
 
-            <div class="multiplier-preview" id="multiplier-preview">最低金額試算：$45 × 1.00 = $45.00</div>
+            <!-- 倍率設定 -->
+            <div id="headset-pane-multiplier" class="headset-pane" style="display:none;">
+                <div class="headset-section-title">倍率調整</div>
+                <div class="multiplier-row">
+                    <div class="multiplier-slider-wrap">
+                        <input type="range" id="multiplier-range" class="multiplier-range" min="1" max="5" step="0.01" value="1" oninput="onMultiplierRangeInput()">
+                        <div class="multiplier-scale"><span>1.00</span><span>5.00</span></div>
+                    </div>
+                    <input type="number" inputmode="decimal" id="multiplier-input" class="multiplier-input" min="1" max="5" step="0.01" value="1.00" onchange="onMultiplierNumberChange()" onblur="onMultiplierNumberChange()" onkeydown="if(event.key==='Enter') this.blur()" autocomplete="off" autocorrect="off" spellcheck="false">
+                </div>
+                <div class="multiplier-preview" id="multiplier-preview">最低金額試算：$45 × 1.00 = $45.00</div>
+                <button class="btn btn-outline multiplier-reset" onclick="setMultiplier(1)">重設為 1.00</button>
+                <p class="multiplier-note">* 設定後，之後結算的訂單金額皆乘上此倍率；已結算的紀錄不受影響。</p>
+            </div>
 
-            <button class="btn btn-outline multiplier-reset" onclick="setMultiplier(1)">重設為 1.00</button>
+            <!-- 達標活動列表 -->
+            <div id="headset-pane-campaigns" class="headset-pane" style="display:none;">
+                <button class="btn" onclick="openCampaignEditor()">＋ 新增達標活動</button>
+                <div id="campaign-list" style="margin-top: 14px;"></div>
+                <p class="multiplier-note">* 以訂單「完成時間」計算是否落在活動區間內，不含取消訂單。<br>* 只會獲得一個達標獎金（取已達成目標中最高的獎金），活動結束後自動計入結束當天的收入。</p>
+            </div>
 
-            <p class="multiplier-note">* 設定後，之後結算的訂單金額皆乘上此倍率；已結算的紀錄不受影響。</p>
+            <!-- 新增 / 編輯達標活動 -->
+            <div id="headset-pane-campaign-edit" class="headset-pane" style="display:none;">
+                <div class="input-group">
+                    <label>活動標題 (選填)</label>
+                    <input type="text" id="cp-title" class="form-control" placeholder="未填寫將自動命名" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+                </div>
+                <div class="input-group">
+                    <label>活動內容 (選填)</label>
+                    <textarea id="cp-content" class="form-control" rows="2" placeholder="例如：週五全日衝單活動" style="resize: vertical;"></textarea>
+                </div>
+                <div class="input-group">
+                    <label>開始</label>
+                    <div class="cp-datetime"><input type="date" id="cp-start-date" class="form-control"><input type="time" id="cp-start-time" class="form-control"></div>
+                </div>
+                <div class="input-group">
+                    <label>結束</label>
+                    <div class="cp-datetime"><input type="date" id="cp-end-date" class="form-control"><input type="time" id="cp-end-time" class="form-control"></div>
+                </div>
+                <div class="input-group" style="margin-bottom: 6px;">
+                    <label>目標與獎勵金額</label>
+                </div>
+                <div id="cp-tiers"></div>
+                <button class="btn btn-outline cp-add-tier" onclick="addCampaignTierRow()">＋ 新增目標</button>
+                <div class="range-calc-error" id="cp-error" style="display:none;"></div>
+                <div style="display:flex; gap:10px; margin-top: 16px;">
+                    <button class="btn btn-outline" onclick="showHeadsetPane('campaigns')">取消</button>
+                    <button class="btn" onclick="saveCampaign()">儲存</button>
+                </div>
+            </div>
         </div>
     </div>
 
