@@ -6,6 +6,7 @@ let usersList = JSON.parse(localStorage.getItem('app_users_list')) || ['新使�
 let customStores = JSON.parse(localStorage.getItem('app_custom_stores')) || [];
 function getStoreKey(key) { return `${currentUser}_${key}`; }
 
+let campaigns = [];
 let activeTimers = [], historyRecords = [], tipRecords = [], costRecords = [], shiftRecords = [], activeShift = null, waitRecords = [], activeWait = null, settings = {};
 let viewedWeekStart = new Date(), currentDailyContext = 'income', currentDailyDateObj = new Date();
 
@@ -760,9 +761,200 @@ function toggleMapSetting() {
 function toggleConfirmDelivery() { settings.confirmDelivery = document.getElementById('setting-confirm-delivery').checked; saveSettings(); applySettings(); }
 
 /* ================== 耳機選單 / 倍率調整 ================== */
+let currentHeadsetPane = 'menu';
 function openHeadsetModal() {
-    updateMultiplierUI(getCurrentMultiplier());
+    showHeadsetPane('menu');
     document.getElementById('headset-modal').classList.add('active');
+}
+function showHeadsetPane(name) {
+    ['menu', 'multiplier', 'campaigns', 'campaign-edit'].forEach(p => {
+        document.getElementById('headset-pane-' + p).style.display = (p === name) ? 'block' : 'none';
+    });
+    const titles = { 'menu': '耳機選單', 'multiplier': '倍率設定', 'campaigns': '達標活動', 'campaign-edit': editingCampaignId ? '編輯達標活動' : '新增達標活動' };
+    document.getElementById('headset-title-text').innerText = titles[name];
+    document.getElementById('headset-back').style.display = (name === 'menu') ? 'none' : 'flex';
+    document.getElementById('headset-title-icon').style.display = (name === 'menu') ? 'block' : 'none';
+    currentHeadsetPane = name;
+    if (name === 'menu') renderHeadsetMenu();
+    if (name === 'multiplier') updateMultiplierUI(getCurrentMultiplier());
+    if (name === 'campaigns') renderCampaignList();
+    document.getElementById('headset-modal-content').scrollTop = 0;
+}
+function headsetBack() { showHeadsetPane(currentHeadsetPane === 'campaign-edit' ? 'campaigns' : 'menu'); }
+function renderHeadsetMenu() {
+    document.getElementById('headset-menu-multiplier-sub').innerText = `目前倍率 ×${getCurrentMultiplier().toFixed(2)}`;
+    const activeCount = campaigns.filter(c => getCampaignProgress(c).status === 'active').length;
+    document.getElementById('headset-menu-campaign-sub').innerText = activeCount > 0 ? `${activeCount} 個進行中活動` : (campaigns.length > 0 ? `已儲存 ${campaigns.length} 個活動` : '尚無達標活動');
+}
+
+/* ================== 達標活動 ================== */
+let editingCampaignId = null;
+const TROPHY_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3"/><path d="M7 5H4v2a3 3 0 0 0 3 3"/></svg>`;
+function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function saveCampaigns() { localStorage.setItem(getStoreKey('order_campaigns'), JSON.stringify(campaigns)); }
+function pad2(n) { return String(n).padStart(2, '0'); }
+function toDateInputStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function fmtCampaignDateTime(ts) { const d = new Date(ts); return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}(${'日一二三四五六'[d.getDay()]}) ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+
+// 活動進度：以訂單完成時間 (timestamp) 落在區間內計算，不含取消單；只取「已達成目標中獎金最高」的一個
+function getCampaignProgress(c) {
+    const count = historyRecords.filter(r => !r.isCancelled && r.timestamp >= c.startTs && r.timestamp <= c.endTs).length;
+    const tiers = [...c.tiers].sort((a, b) => a.target - b.target);
+    let reward = 0, wonTier = null;
+    tiers.forEach(t => { if (count >= t.target && (wonTier === null || t.reward >= reward)) { reward = t.reward; wonTier = t; } });
+    const nextTier = tiers.find(t => count < t.target && t.reward > reward) || null;
+    const now = Date.now();
+    const status = now < c.startTs ? 'upcoming' : (now > c.endTs ? 'ended' : 'active');
+    return { count, reward, wonTier, nextTier, status, tiers };
+}
+
+// 已結束且有達標的活動 → 轉為收入用的「獎金紀錄」(算在活動結束當天，不計入件數)
+function getCampaignBonusRecords() {
+    const list = [];
+    campaigns.forEach(c => {
+        const p = getCampaignProgress(c);
+        if (p.status !== 'ended' || !p.wonTier || p.reward <= 0) return;
+        const d = new Date(c.endTs);
+        list.push({ id: 'bonus_' + c.id, isBonus: true, campaignId: c.id, title: c.title, dateKey: getDateKey(c.endTs), year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate(), timestamp: c.endTs, amount: p.reward, orderCount: p.count, target: p.wonTier.target });
+    });
+    return list;
+}
+function getBonusesBetween(startTs, endTs) { return getCampaignBonusRecords().filter(b => b.timestamp >= startTs && b.timestamp <= endTs); }
+
+function renderCampaignList() {
+    const el = document.getElementById('campaign-list');
+    if (campaigns.length === 0) { el.innerHTML = '<div class="empty-state">尚未建立達標活動</div>'; return; }
+    const order = { active: 0, upcoming: 1, ended: 2 };
+    const items = campaigns.map(c => ({ c, p: getCampaignProgress(c) }))
+        .sort((x, y) => (order[x.p.status] - order[y.p.status]) || (x.p.status === 'ended' ? y.c.endTs - x.c.endTs : x.c.startTs - y.c.startTs));
+    let html = '';
+    items.forEach(({ c, p }) => {
+        const statusText = { active: '進行中', upcoming: '未開始', ended: '已結束' }[p.status];
+        const maxTarget = p.tiers.length ? p.tiers[p.tiers.length - 1].target : 1;
+        const pct = Math.min(100, (p.count / maxTarget) * 100);
+        let progressHtml = '';
+        if (p.status === 'upcoming') {
+            progressHtml = `<div class="cp-progress">尚未開始</div>`;
+        } else {
+            progressHtml = `<div class="cp-progress">${p.status === 'ended' ? '最終' : '已'}完成 <b>${p.count}</b> 單 · ${p.status === 'ended' ? '獲得' : '目前'}獎金 <b class="cp-reward">${fmtMoney(p.reward)}</b></div>`;
+            if (p.status === 'active' && p.nextTier) progressHtml += `<div class="cp-next">再 ${p.nextTier.target - p.count} 單可達 ${p.nextTier.target} 單（獎金 ${fmtMoney(p.nextTier.reward)}）</div>`;
+            progressHtml += `<div class="cp-bar"><div style="width:${pct}%;"></div></div>`;
+        }
+        const chips = p.tiers.map(t => {
+            const cls = (p.wonTier && t === p.wonTier) ? 'won' : (p.count >= t.target && p.status !== 'upcoming' ? 'done' : '');
+            return `<span class="cp-chip ${cls}">${t.target}單 ${fmtMoney(t.reward)}</span>`;
+        }).join('');
+        html += `<div class="cp-card">
+            <div class="cp-card-head"><div class="cp-card-title">${escapeHtml(c.title)}</div><span class="cp-status ${p.status}">${statusText}</span></div>
+            ${c.content ? `<div class="cp-card-content">${escapeHtml(c.content)}</div>` : ''}
+            <div class="cp-card-period">${fmtCampaignDateTime(c.startTs)} ～<br>${fmtCampaignDateTime(c.endTs)}</div>
+            ${progressHtml}
+            <div class="cp-tier-chips">${chips}</div>
+            <div class="cp-actions">
+                <button class="btn btn-outline" onclick="openCampaignEditor('${c.id}')">編輯</button>
+                <button class="btn btn-outline" onclick="openCampaignEditor(null, '${c.id}')">複製使用</button>
+                <button class="btn btn-outline cp-del" onclick="deleteCampaign('${c.id}')">刪除</button>
+            </div>
+        </div>`;
+    });
+    el.innerHTML = html;
+}
+
+function addCampaignTierRow(target = '', reward = '') {
+    const row = document.createElement('div');
+    row.className = 'cp-tier-row';
+    row.innerHTML = `<span>完成</span><input type="number" inputmode="numeric" min="1" step="1" class="form-control cp-tier-target" placeholder="單量" value="${target}"><span>單 獎金$</span><input type="number" inputmode="decimal" min="0" step="any" class="form-control cp-tier-reward" placeholder="金額" value="${reward}"><button class="cp-tier-del" onclick="this.closest('.cp-tier-row').remove()" aria-label="刪除目標">✕</button>`;
+    document.getElementById('cp-tiers').appendChild(row);
+}
+
+// id：編輯既有活動；templateId：複製既有活動當作新活動 (日期移到今天，保留時間與天數)
+function openCampaignEditor(id = null, templateId = null) {
+    editingCampaignId = id;
+    const src = campaigns.find(c => c.id === (id || templateId));
+    document.getElementById('cp-tiers').innerHTML = '';
+    document.getElementById('cp-error').style.display = 'none';
+    const today = new Date();
+    if (src) {
+        document.getElementById('cp-title').value = src.title || '';
+        document.getElementById('cp-content').value = src.content || '';
+        let sd = src.startDate, ed = src.endDate;
+        if (!id) {
+            const dayDiff = Math.round((new Date(src.endDate + 'T00:00') - new Date(src.startDate + 'T00:00')) / 86400000);
+            const end = new Date(today); end.setDate(end.getDate() + dayDiff);
+            sd = toDateInputStr(today); ed = toDateInputStr(end);
+        }
+        document.getElementById('cp-start-date').value = sd;
+        document.getElementById('cp-start-time').value = src.startTime;
+        document.getElementById('cp-end-date').value = ed;
+        document.getElementById('cp-end-time').value = src.endTime;
+        [...src.tiers].sort((a, b) => a.target - b.target).forEach(t => addCampaignTierRow(t.target, t.reward));
+    } else {
+        document.getElementById('cp-title').value = '';
+        document.getElementById('cp-content').value = '';
+        document.getElementById('cp-start-date').value = toDateInputStr(today);
+        document.getElementById('cp-start-time').value = '00:00';
+        document.getElementById('cp-end-date').value = toDateInputStr(today);
+        document.getElementById('cp-end-time').value = '23:59';
+        addCampaignTierRow(); addCampaignTierRow();
+    }
+    showHeadsetPane('campaign-edit');
+}
+
+function showCampaignError(msg) { const el = document.getElementById('cp-error'); el.innerText = msg; el.style.display = 'block'; el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+
+function saveCampaign() {
+    const sd = document.getElementById('cp-start-date').value, st = document.getElementById('cp-start-time').value;
+    const ed = document.getElementById('cp-end-date').value, et = document.getElementById('cp-end-time').value;
+    if (!sd || !st || !ed || !et) return showCampaignError('請完整填寫活動的開始與結束日期、時間');
+    const startTs = new Date(`${sd}T${st}`).getTime();
+    const endTs = new Date(`${ed}T${et}`).getTime() + 59999; // 結束時間包含該分鐘 (例如 23:59 → 23:59:59)
+    if (isNaN(startTs) || isNaN(endTs)) return showCampaignError('日期或時間格式錯誤');
+    if (endTs <= startTs) return showCampaignError('活動區間錯誤：結束時間必須晚於開始時間');
+
+    const tiers = [];
+    const rows = [...document.querySelectorAll('#cp-tiers .cp-tier-row')];
+    for (const row of rows) {
+        const tStr = row.querySelector('.cp-tier-target').value.trim(), rStr = row.querySelector('.cp-tier-reward').value.trim();
+        if (tStr === '' && rStr === '') continue; // 空白列略過
+        const target = Number(tStr), reward = Number(rStr);
+        if (tStr === '' || !Number.isInteger(target) || target < 1) return showCampaignError('目標單量需為 1 以上的整數');
+        if (rStr === '' || isNaN(reward) || reward < 0) return showCampaignError('請為每個目標輸入有效的獎勵金額');
+        if (tiers.some(t => t.target === target)) return showCampaignError(`目標「${target} 單」重複，請修改`);
+        tiers.push({ target, reward });
+    }
+    if (tiers.length === 0) return showCampaignError('請至少設定一個目標與獎勵金額');
+    tiers.sort((a, b) => a.target - b.target);
+
+    let title = document.getElementById('cp-title').value.trim();
+    if (!title) { const d = new Date(startTs); title = `達標活動 ${d.getMonth() + 1}/${d.getDate()}`; }
+    const data = { title, content: document.getElementById('cp-content').value.trim(), startDate: sd, startTime: st, endDate: ed, endTime: et, startTs, endTs, tiers };
+
+    if (editingCampaignId) {
+        const idx = campaigns.findIndex(c => c.id === editingCampaignId);
+        if (idx > -1) campaigns[idx] = { ...campaigns[idx], ...data };
+    } else {
+        campaigns.push({ id: 'cp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4), createdAt: Date.now(), ...data });
+    }
+    saveCampaigns();
+    editingCampaignId = null;
+    refreshIncomeViews();
+    showHeadsetPane('campaigns');
+}
+
+async function deleteCampaign(id) {
+    const c = campaigns.find(x => x.id === id); if (!c) return;
+    const p = getCampaignProgress(c);
+    const extra = (p.status === 'ended' && p.reward > 0) ? `\n此活動的達標獎金 ${fmtMoney(p.reward)} 也會從收入中移除。` : '';
+    if (!(await appConfirm(`確定要刪除【${c.title}】嗎？${extra}`, '刪除達標活動', true))) return;
+    campaigns = campaigns.filter(x => x.id !== id);
+    saveCampaigns();
+    refreshIncomeViews();
+    renderCampaignList();
+}
+
+function refreshIncomeViews() {
+    renderWeeklyData();
+    if (document.getElementById('view-daily-detail').classList.contains('active') && currentDailyContext === 'income') renderDailyDetail();
 }
 function updateMultiplierUI(m) {
     const range = document.getElementById('multiplier-range');
@@ -865,12 +1057,13 @@ function renderWeeklyData() {
     const startTs = viewedWeekStart.getTime(), endTs = end.getTime();
     
     const weeklyRecords = historyRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
-    document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0));
+    const weeklyBonuses = getBonusesBetween(startTs, endTs);
+    document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0) + weeklyBonuses.reduce((sum, b) => sum + b.amount, 0));
     document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(shiftRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs).reduce((s, r) => s + r.durationMins, 0))}`;
     
     const normalWeeklyRecords = weeklyRecords.filter(r => !r.isCancelled);
-    renderStats(normalWeeklyRecords, 'stats-list'); 
-    renderWeeklyChart('weekly-chart-income', normalWeeklyRecords, 'income');
+    renderStats(normalWeeklyRecords.concat(weeklyBonuses), 'stats-list'); 
+    renderWeeklyChart('weekly-chart-income', normalWeeklyRecords.concat(weeklyBonuses), 'income');
 
     const weeklyTips = tipRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
     document.getElementById('weekly-total-amount-tips').innerText = fmtMoney(weeklyTips.reduce((sum, r) => sum + r.amount, 0));
@@ -938,6 +1131,7 @@ function loadData() {
     shiftRecords = JSON.parse(localStorage.getItem(getStoreKey('order_shifts'))) || [];
     activeWait = JSON.parse(localStorage.getItem(getStoreKey('order_active_wait'))) || null;
     waitRecords = JSON.parse(localStorage.getItem(getStoreKey('order_waits'))) || [];
+    campaigns = JSON.parse(localStorage.getItem(getStoreKey('order_campaigns'))) || [];
     renderActiveTimers(); updateShiftUI(); initWeeklyView(); renderWeeklyData(); 
 }
 
@@ -1145,7 +1339,7 @@ function switchUser(name) {
 async function confirmDeleteUser(name) {
     if (usersList.length <= 1) return await appAlert('至少需保留一位使用者！', '錯誤');
     if (await appConfirm(`確定要永久移除使用者 [${name}] 嗎？\n此動作將清空該使用者的所有紀錄，且無法復原！`, '移除確認', true)) {
-        ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_settings', 'order_last_weather', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits'].forEach(key => {
+        ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_settings', 'order_last_weather', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits', 'order_campaigns'].forEach(key => {
             localStorage.removeItem(`${name}_${key}`);
         });
         usersList = usersList.filter(u => u !== name);
@@ -1161,7 +1355,7 @@ async function confirmDeleteUser(name) {
 }
 
 async function addUser() { const name = await appPrompt('請輸入新使用者名稱：', '', '新增使用者'); if (name && name.trim() !== '') { if (usersList.includes(name.trim())) return await appAlert('該使用者已存在！', '錯誤'); usersList.push(name.trim()); localStorage.setItem('app_users_list', JSON.stringify(usersList)); switchUser(name.trim()); } }
-async function renameUser() { const newName = await appPrompt('請輸入新的名稱：', currentUser, '重新命名'); if (newName && newName.trim() !== '' && newName !== currentUser) { if (usersList.includes(newName.trim())) return await appAlert('該名稱已存在！', '錯誤'); const oldPrefix = `${currentUser}_`, newPrefix = `${newName.trim()}_`; ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_settings', 'order_last_weather', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits'].forEach(key => { const data = localStorage.getItem(oldPrefix + key); if (data) { localStorage.setItem(newPrefix + key, data); localStorage.removeItem(oldPrefix + key); } }); usersList[usersList.indexOf(currentUser)] = newName.trim(); localStorage.setItem('app_users_list', JSON.stringify(usersList)); currentUser = newName.trim(); localStorage.setItem('app_current_user', currentUser); updateUIState(); await appAlert('重新命名成功！', '成功'); } }
+async function renameUser() { const newName = await appPrompt('請輸入新的名稱：', currentUser, '重新命名'); if (newName && newName.trim() !== '' && newName !== currentUser) { if (usersList.includes(newName.trim())) return await appAlert('該名稱已存在！', '錯誤'); const oldPrefix = `${currentUser}_`, newPrefix = `${newName.trim()}_`; ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_settings', 'order_last_weather', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits', 'order_campaigns'].forEach(key => { const data = localStorage.getItem(oldPrefix + key); if (data) { localStorage.setItem(newPrefix + key, data); localStorage.removeItem(oldPrefix + key); } }); usersList[usersList.indexOf(currentUser)] = newName.trim(); localStorage.setItem('app_users_list', JSON.stringify(usersList)); currentUser = newName.trim(); localStorage.setItem('app_current_user', currentUser); updateUIState(); await appAlert('重新命名成功！', '成功'); } }
 
 /* ================== 計時器與打卡邏輯 ================== */
 function toggleShift() {
@@ -1512,7 +1706,7 @@ function renderRecordGroup(data, containerId, emptyMsg, context, itemLabel, amou
     if (data.length === 0) return container.innerHTML = `<div class="empty-state">${emptyMsg}</div>`;
     let html = '';
     Object.values(groupDataByDate(data)).sort((a,b)=>new Date(b.dateKey)-new Date(a.dateKey)).forEach(group => {
-        html += `<div class="date-card" onclick="openDailyDetail('${context}', '${group.dateKey}')"><div class="date-header"><div><div class="date-title">${group.title}</div><div class="date-subtitle">${group.records.length} ${itemLabel}</div></div><div class="date-total"><div class="date-amount" style="color:${amountColor};">${amountPrefix}${fmtMoney(group.totalAmount)}</div><div class="date-arrow">查看明細 〉</div></div></div></div>`;
+        html += `<div class="date-card" onclick="openDailyDetail('${context}', '${group.dateKey}')"><div class="date-header"><div><div class="date-title">${group.title}</div><div class="date-subtitle">${group.records.filter(r => !r.isBonus).length} ${itemLabel}</div></div><div class="date-total"><div class="date-amount" style="color:${amountColor};">${amountPrefix}${fmtMoney(group.totalAmount)}</div><div class="date-arrow">查看明細 〉</div></div></div></div>`;
     });
     container.innerHTML = html;
 }
@@ -1561,7 +1755,8 @@ function renderDailyDetail() {
     if (currentDailyContext === 'income') {
         document.getElementById('daily-detail-type-label').innerText = '報酬 (當日總額)';
         const dailyRecords = historyRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
-        document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0));
+        const dailyBonusTotal = getCampaignBonusRecords().filter(b => b.dateKey === dateKey).reduce((s, b) => s + b.amount, 0);
+        document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0) + dailyBonusTotal);
         document.getElementById('daily-detail-amount').style.color = 'var(--success)';
         
         let totalShiftMins = shiftRecords.filter(r => r.dateKey === dateKey).reduce((s,r) => s + r.durationMins, 0) + (activeShift && getDateKey(activeShift.startTime) === dateKey ? Math.floor((Date.now() - activeShift.startTime) / 60000) : 0);
@@ -1671,7 +1866,13 @@ function renderDailyDetailList() {
         
         const targetList = currentDailyTab === 'normal' ? normals : cancelleds;
         
-        if (targetList.length === 0) {
+        // 達標獎金卡片：只在件數明細顯示，不計入件數
+        if (currentDailyTab === 'normal') {
+            getCampaignBonusRecords().filter(b => b.dateKey === dateKey).forEach(b => {
+                html += `<div class="bonus-card"><div class="bonus-icon">${TROPHY_SVG}</div><div class="bonus-info"><div class="bonus-title">達標獎金・${escapeHtml(b.title)}</div><div class="bonus-desc">活動完成 ${b.orderCount} 單（達成 ${b.target} 單目標）</div></div><div class="bonus-amount">${fmtMoney(b.amount)}</div></div>`;
+            });
+        }
+        if (targetList.length === 0 && html === '') {
             html = `<div class="empty-state">此分類目前無紀錄</div>`;
         } else {
             targetList.forEach(r => {
@@ -1731,12 +1932,13 @@ async function applyFilter() {
     const fInc = historyRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime && !r.isCancelled), fTip = tipRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime), fCost = costRecords.filter(r => r.timestamp >= sTime && r.timestamp <= eTime); 
     
     document.getElementById('search-total-orders').innerText = fInc.length + '張'; 
-    document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0)); 
+    const fBonus = getBonusesBetween(sTime, eTime);
+    document.getElementById('search-total-income').innerText = fmtMoney(fInc.reduce((s, r)=>s+r.amount,0) + fBonus.reduce((s, b)=>s+b.amount,0)); 
     document.getElementById('search-total-tips').innerText = fmtMoney(fTip.reduce((s, r)=>s+r.amount,0)); 
     document.getElementById('search-total-costs').innerText = '-' + fmtMoney(fCost.reduce((s, r)=>s+r.amount,0)); 
     const sd = new Date(sTime), ed = new Date(eTime), sStr = `${sd.getFullYear()}/${sd.getMonth()+1}/${sd.getDate()}`, eStr = `${ed.getFullYear()}/${ed.getMonth()+1}/${ed.getDate()}`; 
     document.getElementById('search-date-range').innerText = sStr === eStr ? sStr : `${sStr} ~ ${eStr}`; 
-    renderStats(fInc, 'search-income-list'); 
+    renderStats(fInc.concat(fBonus), 'search-income-list'); 
     renderTips(fTip, 'search-tips-list'); 
     renderCosts(fCost, 'search-costs-list'); 
     closeModal('filter-modal'); 
