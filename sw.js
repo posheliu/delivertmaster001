@@ -1,11 +1,12 @@
 /* Divery Master Service Worker
    讓 Android Chrome 可「安裝」成全螢幕 App；
    採「網路優先」：有網路一律抓最新檔案，沒網路時才用快取，所以更新程式後不會卡在舊版。 */
-const CACHE = 'divery-master-v1';
+const CACHE = 'divery-master-v2';
 const CORE = ['./', './index.html', './style.css', './app.js', './data.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+    // 逐一快取，單一檔案缺少也不會讓整個 Service Worker 安裝失敗
+    e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(CORE.map(u => c.add(u)))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
     e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
