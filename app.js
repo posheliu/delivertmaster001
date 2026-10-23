@@ -349,6 +349,11 @@ function initMap() {
         .setLngLat([currentLoc[1], currentLoc[0]])
         .addTo(mapInstance);
 
+    mapInstance.on('dragstart', () => { mapTouchActive = true; });
+    mapInstance.on('dragend', () => { mapTouchActive = false; lastMapTouchEnd = Date.now(); });
+    mapInstance.on('zoomstart', (e) => { if (e.originalEvent) mapTouchActive = true; });
+    mapInstance.on('zoomend', (e) => { if (e.originalEvent) { mapTouchActive = false; lastMapTouchEnd = Date.now(); } });
+
     mapInstance.on('load', () => {
         mapInstance.addImage('shield-box', generateShieldIcon(), {
             content: [6, 6, 58, 30],
@@ -402,11 +407,11 @@ function initMap() {
                 ],
                 'line-width': [
                     'interpolate', ['linear'], ['zoom'],
-                    11, 4.5,
-                    13, 7.5,
-                    14.5, 10.5,
-                    16, 15.5,
-                    18, 24
+                    11, 6.5,
+                    13, 10.5,
+                    14.5, 14.5,
+                    16, 20.5,
+                    18, 30
                 ]
             }
         }, firstSymbolId);
@@ -480,12 +485,13 @@ function initMap() {
                         if (markerDiv) markerDiv.style.transform = `rotate(${position.coords.heading}deg)`;
                     }
                 }
+                updateMovingState(position);
                 if (!hasCenteredMapInit) {
                     recenterMap(true); 
                     hasCenteredMapInit = true;
-                } else if (mapInstance) {
-                    const bounds = mapInstance.getBounds();
-                    if (!bounds.contains([currentLoc[1], currentLoc[0]])) recenterMap();
+                } else if (mapInstance && isUserMoving() && !isUserTouchingMap()) {
+                    // 移動中：鎖定藍點在畫面中；靜止時不移動地圖，讓使用者自由瀏覽
+                    recenterMap(false, 800);
                 }
             },
             (error) => { console.warn("定位獲取失敗: ", error); },
@@ -496,7 +502,32 @@ function initMap() {
     setTimeout(() => { if (mapInstance) mapInstance.resize(); }, 500);
 }
 
-function recenterMap(instant = false) {
+/* ---- 移動偵測：速度 ≥ 1.5 m/s (約 5.4 km/h) 視為移動中，停下後 8 秒才解除鎖定，避免紅燈時一直切換 ---- */
+const MOVING_SPEED = 1.5, MOVING_HOLD_MS = 8000;
+let lastGeoFix = null, movingUntil = 0, mapTouchActive = false, lastMapTouchEnd = 0;
+function geoDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371000, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+}
+function updateMovingState(position) {
+    const { latitude, longitude, speed, accuracy } = position.coords;
+    const t = position.timestamp || Date.now();
+    let v = (speed !== null && !isNaN(speed)) ? speed : null;
+    if (v === null && lastGeoFix) {
+        const dist = geoDistance(lastGeoFix.lat, lastGeoFix.lon, latitude, longitude), dt = (t - lastGeoFix.t) / 1000;
+        // 位移需大於定位誤差才算數，避免靜止時 GPS 飄移被誤判為移動
+        v = (dt > 0 && dist > Math.max(accuracy || 0, 10)) ? dist / dt : 0;
+    }
+    if (v !== null && v >= MOVING_SPEED) movingUntil = Date.now() + MOVING_HOLD_MS;
+    lastGeoFix = { lat: latitude, lon: longitude, t };
+}
+function isUserMoving() { return Date.now() < movingUntil; }
+// 使用者正在拖動地圖 (或剛放開 3 秒內) 時先不搶回畫面
+function isUserTouchingMap() { return mapTouchActive || (Date.now() - lastMapTouchEnd < 3000); }
+
+function recenterMap(instant = false, duration = 250) {
     if (mapInstance && currentLoc) {
         const zoom = mapInstance.getZoom() || 15;
         const point = mapInstance.project([currentLoc[1], currentLoc[0]]);
@@ -506,7 +537,7 @@ function recenterMap(instant = false) {
         if (instant) {
             mapInstance.jumpTo({ center: targetLngLat, zoom: zoom });
         } else {
-            mapInstance.easeTo({ center: targetLngLat, zoom: zoom, duration: 250 });
+            mapInstance.easeTo({ center: targetLngLat, zoom: zoom, duration: duration });
         }
     }
 }
@@ -857,6 +888,16 @@ function escapeHtml(str) { return String(str ?? '').replace(/[&<>"']/g, c => ({ 
 function saveCampaigns() { localStorage.setItem(getStoreKey('order_campaigns'), JSON.stringify(campaigns)); }
 function pad2(n) { return String(n).padStart(2, '0'); }
 function toDateInputStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+// 活動區間單行顯示：同一天只寫一次日期；同年份結束日省略年份
+function fmtCampaignPeriod(startTs, endTs) {
+    const s = new Date(startTs), e = new Date(endTs);
+    const hm = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const wd = d => '日一二三四五六'[d.getDay()];
+    const startStr = `${s.getFullYear()}/${pad2(s.getMonth() + 1)}/${pad2(s.getDate())}(${wd(s)}) ${hm(s)}`;
+    if (getDateKey(startTs) === getDateKey(endTs)) return `${startStr}~${hm(e)}`;
+    const endDate = (s.getFullYear() === e.getFullYear() ? '' : `${e.getFullYear()}/`) + `${pad2(e.getMonth() + 1)}/${pad2(e.getDate())}(${wd(e)})`;
+    return `${startStr}~${endDate} ${hm(e)}`;
+}
 function fmtCampaignDateTime(ts) { const d = new Date(ts); return `${d.getFullYear()}/${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}(${'日一二三四五六'[d.getDay()]}) ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
 
 // 訂單接單時間 (計時器開始)：新紀錄直接存有 startTs；舊紀錄由完成時間的日期 + startTimeStr 推回 (跨午夜則退一天)
@@ -958,7 +999,7 @@ function renderCampaignList() {
             </div>
             <div class="cp-body-wrap"><div class="cp-body"><div class="cp-body-inner">
                 ${c.content ? `<div class="cp-card-content">${escapeHtml(c.content)}</div>` : ''}
-                <div class="cp-card-period">${fmtCampaignDateTime(c.startTs)} ～<br>${fmtCampaignDateTime(c.endTs)}</div>
+                <div class="cp-card-period">${fmtCampaignPeriod(c.startTs, c.endTs)}</div>
                 ${progressHtml}
                 <div class="cp-tier-chips">${chips}</div>
                 ${actions}
