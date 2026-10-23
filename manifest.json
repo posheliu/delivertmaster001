@@ -1,6 +1,6 @@
 {
-  "name": "Divery Master",
-  "short_name": "Divery Master",
+  "name": "Delivery Master",
+  "short_name": "Delivery Master",
   "description": "外送接單計時、收入與達標活動管理",
   "id": "./",
   "start_url": "./index.html",
