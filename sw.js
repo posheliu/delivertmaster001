@@ -1,7 +1,7 @@
 /* Delivery Master Service Worker
    讓 Android Chrome 可「安裝」成全螢幕 App；
    採「網路優先」：有網路一律抓最新檔案，沒網路時才用快取，所以更新程式後不會卡在舊版。 */
-const CACHE = 'delivery-master-v2';
+const CACHE = 'delivery-master-v3';
 const CORE = ['./', './index.html', './style.css', './app.js', './data.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
