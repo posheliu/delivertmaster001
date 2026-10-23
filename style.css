@@ -645,7 +645,7 @@ body.night-mode .cp-status.active { background: rgba(30,101,63,0.35); color: #85
 body.night-mode .cp-status.upcoming { background: rgba(42,77,143,0.4); color: #A8C2F0; }
 body.night-mode .cp-status.ended { background: rgba(255,255,255,0.1); color: #b4b4ba; }
 .cp-card-content { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
-.cp-card-period { font-size: 0.82rem; color: var(--text-main); margin-top: 8px; }
+.cp-card-period { font-size: 0.82rem; color: var(--text-main); margin-top: 8px; white-space: nowrap; overflow-x: auto; }
 .cp-progress { font-size: 0.88rem; color: var(--text-main); margin-top: 8px; }
 .cp-progress b { color: var(--primary); }
 .cp-progress .cp-reward { color: var(--success); }
