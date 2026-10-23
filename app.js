@@ -229,6 +229,9 @@ function showCustomDialog({ type, title, message, defaultValue = '', confirmText
         confirmBtn.style.flex = '1';
         btnsEl.appendChild(confirmBtn);
 
+        // 點視窗外圍：提示框視為「確定」，確認框 / 輸入框視為「取消」
+        modal.onclick = (e) => { if (e.target === modal) handleClose(type === 'alert' ? true : null); };
+
         modal.classList.add('active');
 
         if (type === 'prompt') {
@@ -2135,7 +2138,7 @@ function openEdit(category, id) { closeAllSwipes(); document.getElementById('edi
 async function saveEdit() { const id = document.getElementById('edit-id').value, category = document.getElementById('edit-category').value, amount = Number(document.getElementById('edit-amount').value); if (!amount || amount <= 0) return await appAlert('請輸入有效金額', '輸入錯誤'); if (category === 'tip') { const idx = tipRecords.findIndex(t => t.id === id); if(idx > -1) { tipRecords[idx].amount = amount; tipRecords[idx].method = document.getElementById('edit-tip-method').value; localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } else { const idx = costRecords.findIndex(t => t.id === id); if(idx > -1) { const type = document.getElementById('edit-cost-type').value; costRecords[idx].amount = amount; costRecords[idx].type = type; costRecords[idx].memo = document.getElementById('edit-cost-memo').value; costRecords[idx].mileage = (type === '保養維修' || type === '加油') ? document.getElementById('edit-cost-mileage').value : ''; localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } closeModal('edit-modal'); }
 
 let currentCalDate = new Date(), calSelStart = null, calSelEnd = null;
-function openFilterModal() { pushHistory(); calSelStart = null; calSelEnd = null; renderCalendar(); document.getElementById('filter-modal').classList.add('active'); } 
+function openFilterModal() { pushHistory(); const today = new Date(); today.setHours(0, 0, 0, 0); calSelStart = today.getTime(); calSelEnd = null; currentCalDate = new Date(today); renderCalendar(); /* 預設選取今天 */ document.getElementById('filter-modal').classList.add('active'); } 
 function closeModal(id) { document.getElementById(id).classList.remove('active'); } 
 function calPrevMonth() { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); } 
 function calNextMonth() { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); }
