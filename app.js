@@ -263,7 +263,35 @@ function loadSettingsForCurrentUser() {
     settings.multiplier = clampMultiplier(settings.multiplier === undefined ? 1 : settings.multiplier);
 }
 
+/* ================== APP 化操作限制 (地圖除外) ================== */
+function isEditableTarget(t) { return !!(t && t.closest && t.closest('input, textarea, select, [contenteditable="true"]')); }
+function isMapTarget(t) { return !!(t && t.closest && t.closest('#map')); }
+function initAppLikeBehavior() {
+    // 禁止選取文字、長按選單、複製/剪下 (輸入框除外)
+    document.addEventListener('selectstart', e => { if (!isEditableTarget(e.target)) e.preventDefault(); });
+    document.addEventListener('contextmenu', e => { if (!isEditableTarget(e.target)) e.preventDefault(); });
+    ['copy', 'cut'].forEach(type => document.addEventListener(type, e => { if (!isEditableTarget(e.target)) e.preventDefault(); }));
+    document.addEventListener('dragstart', e => { if (!isEditableTarget(e.target)) e.preventDefault(); });
+    // 禁止雙指縮放 (iOS Safari 會無視 user-scalable=no)
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(type => document.addEventListener(type, e => { if (!isMapTarget(e.target)) e.preventDefault(); }, { passive: false }));
+    document.addEventListener('touchmove', e => { if (e.touches.length > 1 && !isMapTarget(e.target)) e.preventDefault(); }, { passive: false });
+    // 雙擊放大由 CSS touch-action: manipulation 處理 (不攔截 touchend，以免快速連點按鈕失效)
+    // 桌機：Ctrl+滾輪、Ctrl +/-/0 縮放、Ctrl+A 全選
+    document.addEventListener('wheel', e => { if (e.ctrlKey && !isMapTarget(e.target)) e.preventDefault(); }, { passive: false });
+    document.addEventListener('keydown', e => {
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const k = e.key.toLowerCase();
+        if (['+', '=', '-', '_', '0'].includes(k)) e.preventDefault();
+        if ((k === 'a' || k === 'c' || k === 'x') && !isEditableTarget(e.target)) e.preventDefault();
+    });
+}
+
 window.onload = function() {
+    initAppLikeBehavior();
+    // 註冊 Service Worker：讓 Android Chrome 能「安裝應用程式」並以全螢幕開啟 (需在 https 網址下)
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker 註冊失敗', err));
+    }
     history.replaceState({ view: 0 }, '');
     injectNewStyles();
     if (currentUser === '新使用者' && !localStorage.getItem(getStoreKey('order_history_records')) && localStorage.getItem('order_history_records')) {
@@ -937,6 +965,55 @@ function getCampaignBonusRecords() {
 }
 function getBonusesBetween(startTs, endTs) { return getCampaignBonusRecords().filter(b => b.timestamp >= startTs && b.timestamp <= endTs); }
 
+const FLAG_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>`;
+
+// 進度軌道：起點旗子 → 各目標節點 (依單量比例擺放) → 終點獎盃 + 最高獎金
+function renderCampaignTrack(c, p, pct) {
+    const max = p.tiers.length ? p.tiers[p.tiers.length - 1].target : 1;
+    const maxReward = Math.max(...p.tiers.map(t => t.reward));
+    const counted = p.status !== 'upcoming';
+    const dots = p.tiers.slice(0, -1).map(t => `<span class="cp-track-dot ${counted && p.count >= t.target ? 'done' : ''}" style="left:${(t.target / max) * 100}%;"></span>`).join('');
+    const lastDone = counted && p.count >= max;
+    return `<div class="cp-track">
+        <span class="cp-track-start">${FLAG_SVG}</span>
+        <div class="cp-track-line"><div class="cp-track-fill" style="width:${counted ? pct : 0}%;"></div>${dots}</div>
+        <span class="cp-track-end ${lastDone ? 'done' : ''}">${TROPHY_SVG}</span>
+    </div><div class="cp-track-max">${fmtMoney(maxReward)}</div>`;
+}
+function renderCampaignNextRow(p) {
+    if (p.status === 'ended') {
+        return p.wonTier
+            ? `<div class="cp-next-row"><div><b>最終達成</b><div class="cp-next-desc">完成 ${p.count} 單，達成 ${p.wonTier.target} 單目標。</div></div><span class="cp-pill won">${fmtMoney(p.reward)}</span></div>`
+            : `<div class="cp-next-row"><div><b>未達標</b><div class="cp-next-desc">完成 ${p.count} 單，距第一個目標差 ${p.tiers[0].target - p.count} 單。</div></div><span class="cp-pill">$0.00</span></div>`;
+    }
+    const base = p.status === 'upcoming' ? 0 : p.count;
+    const next = p.tiers.find(t => base < t.target);
+    if (!next) return `<div class="cp-next-row"><div><b>已達成全部目標</b><div class="cp-next-desc">完成 ${p.count} 單。</div></div><span class="cp-pill won">${fmtMoney(p.reward)}</span></div>`;
+    return `<div class="cp-next-row"><div><b>下個目標</b><div class="cp-next-desc">於任務區間再達成 <b>${next.target - base}</b> 單。</div></div><span class="cp-pill">${fmtMoney(next.reward)}</span></div>`;
+}
+
+// 所有目標 (底部彈出面板)
+function openCampaignTargets(id) {
+    const c = campaigns.find(x => x.id === id); if (!c) return;
+    const p = getCampaignProgress(c);
+    const base = p.status === 'upcoming' ? 0 : p.count;
+    document.getElementById('targets-sheet-title').innerText = c.title;
+    document.getElementById('targets-sheet-list').innerHTML = p.tiers.map((t, i) => {
+        const isLast = i === p.tiers.length - 1;
+        const won = p.wonTier === t, reached = base >= t.target;
+        let desc;
+        if (reached) desc = won ? `已達成（${t.target} 單）・此為獲得的獎金` : `已達成（${t.target} 單）`;
+        else if (p.status === 'ended') desc = `未達成（目標 ${t.target} 單，差 ${t.target - base} 單）`;
+        else desc = `於任務區間再達成 <b>${t.target - base}</b> 單。<span class="sheet-total">（目標 ${t.target} 單）</span>`;
+        return `<div class="sheet-row ${reached ? 'reached' : ''}">
+            <div class="sheet-row-head"><span class="sheet-row-icon">${isLast ? TROPHY_SVG : FLAG_SVG}</span><b>目標 #${i + 1}</b><span class="cp-pill ${won ? 'won' : ''}">${fmtMoney(t.reward)}</span></div>
+            <div class="sheet-row-desc">${desc}</div>
+        </div>`;
+    }).join('');
+    document.getElementById('targets-sheet').classList.add('active');
+}
+function closeCampaignTargets() { document.getElementById('targets-sheet').classList.remove('active'); }
+
 let currentCampaignTab = 'active';
 const campaignExpanded = {}; // id → 是否展開；未設定時預設只展開「進行中」
 function switchCampaignTab(tab) { currentCampaignTab = tab; renderCampaignList(); }
@@ -978,14 +1055,9 @@ function renderCampaignList() {
             progressHtml = `<div class="cp-progress">尚未開始</div>`;
         } else {
             progressHtml = `<div class="cp-progress">${p.status === 'ended' ? '最終' : '已'}完成 <b>${p.count}</b> 單 · ${p.status === 'ended' ? '獲得' : '目前'}獎金 <b class="cp-reward">${fmtMoney(p.reward)}</b></div>`;
-            if (p.status === 'active' && p.nextTier) progressHtml += `<div class="cp-next">再 ${p.nextTier.target - p.count} 單可達 ${p.nextTier.target} 單（獎金 ${fmtMoney(p.nextTier.reward)}）</div>`;
             if (p.pending > 0) progressHtml += `<div class="cp-next">另有 ${p.pending} 單配送中，送達後計入</div>`;
-            progressHtml += `<div class="cp-bar"><div style="width:${pct}%;"></div></div>`;
         }
-        const chips = p.tiers.map(t => {
-            const cls = (p.wonTier && t === p.wonTier) ? 'won' : (p.count >= t.target && p.status !== 'upcoming' ? 'done' : '');
-            return `<span class="cp-chip ${cls}">${t.target}單 ${fmtMoney(t.reward)}</span>`;
-        }).join('');
+        const targetsHtml = renderCampaignTrack(c, p, pct) + renderCampaignNextRow(p) + `<div class="cp-all-link" onclick="openCampaignTargets('${c.id}')">查看所有目標</div>`;
         const actions = campaignEditMode ? `<div class="cp-actions">
                 <button class="btn btn-outline" onclick="openCampaignEditor('${c.id}')">編輯</button>
                 <button class="btn btn-outline" onclick="openCampaignEditor(null, '${c.id}')">複製使用</button>
@@ -1001,7 +1073,7 @@ function renderCampaignList() {
                 ${c.content ? `<div class="cp-card-content">${escapeHtml(c.content)}</div>` : ''}
                 <div class="cp-card-period">${fmtCampaignPeriod(c.startTs, c.endTs)}</div>
                 ${progressHtml}
-                <div class="cp-tier-chips">${chips}</div>
+                ${targetsHtml}
                 ${actions}
             </div></div></div>
         </div>`;
