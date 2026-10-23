@@ -9,6 +9,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#ffffff">
     <title>Divery Master</title>
+    <!-- 安裝成 App (全螢幕、無網址列) -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-title" content="Divery Master">
     <!-- MapLibre GL 向量地圖樣式庫 -->
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <link rel="stylesheet" href="style.css">
@@ -808,6 +813,20 @@
                     <button class="btn" onclick="saveCampaign()">儲存</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 達標活動：所有目標 (底部面板) -->
+    <div class="sheet-overlay" id="targets-sheet" onclick="if(event.target === this) closeCampaignTargets()">
+        <div class="sheet-panel">
+            <div class="sheet-header">
+                <span></span>
+                <h3>所有目標</h3>
+                <button class="headset-close" onclick="closeCampaignTargets()" aria-label="關閉"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+            </div>
+            <div class="sheet-subtitle" id="targets-sheet-title"></div>
+            <div class="sheet-list" id="targets-sheet-list"></div>
+            <div class="sheet-footer"><button class="btn sheet-ok" onclick="closeCampaignTargets()">我瞭解了</button></div>
         </div>
     </div>
 
