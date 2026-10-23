@@ -2,8 +2,15 @@
    全域狀態與資料初始化
    ============================================================== */
 let currentUser = localStorage.getItem('app_current_user') || '新使用者';
-let usersList = JSON.parse(localStorage.getItem('app_users_list')) || ['新使用者'];
-let customStores = JSON.parse(localStorage.getItem('app_custom_stores')) || [];
+// 安全讀取：資料毀損時不會讓整個 App 白屏，改用預設值並保留原始資料備查
+function loadJSON(key, fallback) {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    try { const v = JSON.parse(raw); return (v === null || v === undefined) ? fallback : v; }
+    catch (e) { console.error('資料毀損：' + key, e); try { localStorage.setItem(key + '__corrupt_' + Date.now(), raw); } catch (_) {} return fallback; }
+}
+let usersList = loadJSON('app_users_list', ['新使用者']);
+let customStores = loadJSON('app_custom_stores', []);
 function getStoreKey(key) { return `${currentUser}_${key}`; }
 
 let campaigns = [];
@@ -31,6 +38,10 @@ const NAV_ICONS = [
 // 瀏覽器返回鍵狀態控制
 let isPopStateAction = false;
 window.addEventListener('popstate', (e) => {
+    // 程式自己關閉視窗時呼叫的 history.back()，不做任何畫面動作
+    if (ovlIgnorePops > 0) { ovlIgnorePops--; if (ovlIgnorePops === 0) flushPendingPushes(); return; }
+    // 有開啟中的視窗：返回鍵只關閉最上層的視窗
+    if (ovlStack.length > 0) { closeTopOverlayByBack(); return; }
     isPopStateAction = true;
     if (document.getElementById('view-daily-detail').classList.contains('active')) {
         closeDailyDetail(true);
@@ -43,7 +54,96 @@ window.addEventListener('popstate', (e) => {
 });
 
 function pushHistory() {
-    if (!isPopStateAction) history.pushState({}, '');
+    if (!isPopStateAction) safePushState({});
+}
+
+/* ================== 手機返回鍵關閉視窗 ==================
+   每開一個視窗就新增一筆返回紀錄；按返回鍵 → 關閉最上層視窗。
+   用按鈕 / 點外圍關閉視窗時，自動把那筆紀錄退掉，避免要多按一次返回鍵。 */
+const OVERLAY_SELECTOR = '.modal-overlay, .sheet-overlay, #side-menu';
+let ovlStack = [];            // 目前開啟中、且有返回紀錄的視窗 id (由下到上)
+let ovlIgnorePops = 0;        // 等待中的「程式自行退回」次數
+let ovlPendingPushes = [];    // 退回完成前先排隊的新增紀錄
+const ovlActiveState = new Map();
+
+function safePushState(state) {
+    if (ovlIgnorePops > 0) ovlPendingPushes.push(state);   // 退回還沒完成，先排隊避免順序錯亂
+    else history.pushState(state, '');
+}
+function flushPendingPushes() { const q = ovlPendingPushes; ovlPendingPushes = []; q.forEach(st => history.pushState(st, '')); }
+
+function closeOverlayById(id) {
+    if (id === 'side-menu') { if (sideMenuOpen) toggleSideMenu(); return; }
+    if (id === 'targets-sheet') { closeCampaignTargets(); return; }
+    if (id === 'custom-dialog-modal') {
+        const m = document.getElementById(id);
+        if (typeof m.onclick === 'function') m.onclick({ target: m }); else closeModal(id); // 提示框 = 確定，確認框 = 取消
+        return;
+    }
+    closeModal(id);
+}
+
+function closeTopOverlayByBack() {
+    const id = ovlStack[ovlStack.length - 1];
+    // 耳機選單在子頁面時：返回鍵先回上一頁，視窗保持開啟
+    if (id === 'headset-modal' && currentHeadsetPane !== 'menu') {
+        headsetBack();
+        history.pushState({ ovl: id }, '');
+        return;
+    }
+    ovlStack.pop();               // 先移出，觀察器看到關閉時就不會再退一次
+    closeOverlayById(id);
+}
+
+// 視窗關閉後要接著開新頁面 (查詢結果 / 側選單換頁)：把該視窗的返回紀錄直接轉成新頁面的紀錄
+function convertOverlayEntry(id, newState) {
+    if (ovlStack[ovlStack.length - 1] === id && ovlIgnorePops === 0 && history.state && history.state.ovl === id) {
+        ovlStack.pop();
+        history.replaceState(newState, '');
+        return true;
+    }
+    return false;
+}
+
+function onOverlayMutations() {
+    const opened = [], closed = [];
+    document.querySelectorAll(OVERLAY_SELECTOR).forEach(el => {
+        if (!el.id) return;
+        const now = el.classList.contains('active'), before = ovlActiveState.get(el.id) || false;
+        if (now !== before) { ovlActiveState.set(el.id, now); (now ? opened : closed).push(el.id); }
+    });
+    // 同一瞬間「關一個、開一個」(例如店家選項 → 輸入單號)：直接沿用同一筆返回紀錄
+    while (closed.length && opened.length) {
+        const c = closed.shift(), o = opened.shift(), idx = ovlStack.lastIndexOf(c);
+        if (idx > -1) { ovlStack[idx] = o; if (history.state && history.state.ovl === c) history.replaceState({ ovl: o }, ''); }
+        else { ovlStack.push(o); safePushState({ ovl: o }); }
+    }
+    closed.forEach(id => {
+        const idx = ovlStack.lastIndexOf(id);
+        if (idx === -1) return;  // 已由返回鍵處理
+        ovlStack.splice(idx, 1);
+        ovlIgnorePops++; history.back();
+    });
+    opened.forEach(id => { ovlStack.push(id); safePushState({ ovl: id }); });
+}
+
+function initOverlayBackHandling() {
+    const obs = new MutationObserver(onOverlayMutations);
+    document.querySelectorAll(OVERLAY_SELECTOR).forEach(el => {
+        ovlActiveState.set(el.id, el.classList.contains('active'));
+        obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    });
+}
+
+// 側邊選單點選頁面
+function menuNavigate(index) {
+    if (sideMenuOpen && index !== 0 && index !== currentViewIndex && convertOverlayEntry('side-menu', {})) {
+        switchView(index, false, true);   // 選單的返回紀錄直接變成新頁面的返回紀錄
+        toggleSideMenu();
+    } else {
+        if (sideMenuOpen) toggleSideMenu();
+        switchView(index);
+    }
 }
 
 // MapLibre GL 地圖變數
@@ -238,7 +338,7 @@ function showCustomDialog({ type, title, message, defaultValue = '', confirmText
             inputEl.focus();
             setTimeout(() => {
                 inputEl.focus();
-                inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length);
+                try { inputEl.setSelectionRange(inputEl.value.length, inputEl.value.length); } catch (_) {} // 數字欄位不支援游標定位
             }, 50);
         }
     });
@@ -251,7 +351,7 @@ async function appPrompt(message, defaultValue = '', title = '請輸入', isNume
 /* ================== 載入初始化 ================== */
 function loadSettingsForCurrentUser() {
     let saved = localStorage.getItem(getStoreKey('order_settings'));
-    if (saved) { settings = JSON.parse(saved); } 
+    if (saved) { settings = loadJSON(getStoreKey('order_settings'), {}); } 
     else {
         let globalSaved = localStorage.getItem('order_settings');
         if (globalSaved) { settings = JSON.parse(globalSaved); if(settings.theme && !settings.colorTheme) { settings.colorTheme = settings.theme; settings.effectTheme = 'none'; delete settings.theme; } } 
@@ -291,10 +391,13 @@ function initAppLikeBehavior() {
 
 window.onload = function() {
     initAppLikeBehavior();
+    initOverlayBackHandling();
     // 註冊 Service Worker：讓 Android Chrome 能「安裝應用程式」並以全螢幕開啟 (需在 https 網址下)
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
         navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker 註冊失敗', err));
     }
+    // 申請「永久儲存」，降低瀏覽器在空間不足時自動清除紀錄的機率
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     history.replaceState({ view: 0 }, '');
     injectNewStyles();
     if (currentUser === '新使用者' && !localStorage.getItem(getStoreKey('order_history_records')) && localStorage.getItem('order_history_records')) {
@@ -505,7 +608,15 @@ function initMap() {
         });
     });
         
-    if ("geolocation" in navigator) {
+    if (settings.enableMap !== false) startGeoWatch();
+    setTimeout(() => { if (mapInstance) mapInstance.resize(); }, 500);
+}
+
+// GPS 只在啟用滿版地圖時運作，關閉地圖可省電
+function stopGeoWatch() { if (geoWatchId !== null && navigator.geolocation) { navigator.geolocation.clearWatch(geoWatchId); geoWatchId = null; } }
+function startGeoWatch() {
+    if (geoWatchId !== null || !("geolocation" in navigator)) return;
+    {
         geoWatchId = navigator.geolocation.watchPosition(
             (position) => {
                 currentLoc = [position.coords.latitude, position.coords.longitude];
@@ -529,8 +640,6 @@ function initMap() {
             { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
         );
     }
-
-    setTimeout(() => { if (mapInstance) mapInstance.resize(); }, 500);
 }
 
 /* ---- 移動偵測：速度 ≥ 1.5 m/s (約 5.4 km/h) 視為移動中，停下後 8 秒才解除鎖定，避免紅燈時一直切換 ---- */
@@ -778,6 +887,7 @@ function applySettings() {
         if (bottomShift) bottomShift.style.display = 'none';
 
         if (mapInstance) { 
+            startGeoWatch();
             setTimeout(() => mapInstance.resize(), 300); 
             const panel = document.getElementById('bottom-panel');
             if (panel && (!panel.style.transform || panel.style.transform === 'none')) {
@@ -788,6 +898,7 @@ function applySettings() {
         }
     } else {
         document.body.classList.remove('map-enabled');
+        stopGeoWatch();
         const sideShift = document.getElementById('side-menu-shift-section');
         if (sideShift) sideShift.style.display = 'none';
         const bottomShift = document.getElementById('bottom-panel-shift-card');
@@ -1227,7 +1338,7 @@ function openOrderNumberModal(title, defaultValue, callback) {
     pendingOrderAction = callback;
     document.getElementById('order-number-modal').classList.add('active');
     input.focus();
-    setTimeout(() => { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }, 50);
+    setTimeout(() => { input.focus(); try { input.setSelectionRange(input.value.length, input.value.length); } catch (_) {} }, 50);
     input.onkeypress = function(e) { if (e.key === 'Enter') confirmOrderNumber(); };
 }
 function confirmOrderNumber() {
@@ -1236,6 +1347,17 @@ function confirmOrderNumber() {
 }
 
 /* ================== 每週油耗與圖表 (修正高低動態比例) ================== */
+// 上線時數：只計算落在 [rangeStart, rangeEnd] 內的部分 (跨午夜 / 跨週的時段會正確拆分)
+function getShiftMinutesBetween(rangeStart, rangeEnd) {
+    let ms = 0;
+    shiftRecords.forEach(r => {
+        const s = r.startTime || (r.timestamp - r.durationMins * 60000), e = r.endTime || r.timestamp;
+        ms += Math.max(0, Math.min(e, rangeEnd) - Math.max(s, rangeStart));
+    });
+    if (activeShift) ms += Math.max(0, Math.min(Date.now(), rangeEnd) - Math.max(activeShift.startTime, rangeStart));
+    return Math.round(ms / 60000);
+}
+
 function calculateWeeklyFuel(startTs, endTs) {
     const allFuel = costRecords.filter(r => r.type === '加油' && r.mileage && Number(r.mileage) > 0).sort((a,b) => a.timestamp - b.timestamp);
     const weeklyFuel = allFuel.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
@@ -1298,7 +1420,7 @@ function renderWeeklyData() {
     const weeklyRecords = historyRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs);
     const weeklyBonuses = getBonusesBetween(startTs, endTs);
     document.getElementById('weekly-total-amount').innerText = fmtMoney(weeklyRecords.reduce((sum, r) => sum + r.amount, 0) + weeklyBonuses.reduce((sum, b) => sum + b.amount, 0));
-    document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(shiftRecords.filter(r => r.timestamp >= startTs && r.timestamp <= endTs).reduce((s, r) => s + r.durationMins, 0))}`;
+    document.getElementById('weekly-online-hours').innerText = `上線時數: ${formatMins(getShiftMinutesBetween(startTs, endTs))}`;
     
     renderStats(weeklyRecords.concat(weeklyBonuses), 'stats-list'); 
     renderWeeklyChart('weekly-chart-income', weeklyRecords.concat(weeklyBonuses), 'income');
@@ -1361,15 +1483,15 @@ function startCanvasEngine(themeType) {
     視圖切換與使用者管理邏輯
     ============================================================== */
 function loadData() { 
-    activeTimers = JSON.parse(localStorage.getItem(getStoreKey('order_active_timers'))) || []; 
-    historyRecords = JSON.parse(localStorage.getItem(getStoreKey('order_history_records'))) || []; 
-    tipRecords = JSON.parse(localStorage.getItem(getStoreKey('order_tips'))) || []; 
-    costRecords = JSON.parse(localStorage.getItem(getStoreKey('order_costs'))) || []; 
-    activeShift = JSON.parse(localStorage.getItem(getStoreKey('order_active_shift'))) || null;
-    shiftRecords = JSON.parse(localStorage.getItem(getStoreKey('order_shifts'))) || [];
-    activeWait = JSON.parse(localStorage.getItem(getStoreKey('order_active_wait'))) || null;
-    waitRecords = JSON.parse(localStorage.getItem(getStoreKey('order_waits'))) || [];
-    campaigns = JSON.parse(localStorage.getItem(getStoreKey('order_campaigns'))) || [];
+    activeTimers = loadJSON(getStoreKey('order_active_timers'), []); 
+    historyRecords = loadJSON(getStoreKey('order_history_records'), []); 
+    tipRecords = loadJSON(getStoreKey('order_tips'), []); 
+    costRecords = loadJSON(getStoreKey('order_costs'), []); 
+    activeShift = loadJSON(getStoreKey('order_active_shift'), null);
+    shiftRecords = loadJSON(getStoreKey('order_shifts'), []);
+    activeWait = loadJSON(getStoreKey('order_active_wait'), null);
+    waitRecords = loadJSON(getStoreKey('order_waits'), []);
+    campaigns = loadJSON(getStoreKey('order_campaigns'), []);
     renderActiveTimers(); updateShiftUI(); initWeeklyView(); renderWeeklyData(); 
 }
 
@@ -1399,7 +1521,7 @@ function switchView(index, isInstant = false, fromPopState = false) {
         else { el.style.transition = 'none'; el.style.visibility = 'hidden'; }
     });
     
-    if([1, 2, 3].includes(index)) { initWeeklyView(); renderWeeklyData(); }
+    if([1, 2, 3].includes(index)) { if (![1, 2, 3].includes(oldIndex)) initWeeklyView(); renderWeeklyData(); } // 收入/小費/成本 之間切換時保留正在看的那一週
     if(index === 4) { calculatePunctuality(); }
     if(index === 5) { switchSettingsTab(currentSettingsTab); }
     
@@ -1573,6 +1695,7 @@ function openUserModal(mode = 'switch') {
 function switchUser(name) {
     currentUser = name; localStorage.setItem('app_current_user', currentUser);
     loadSettingsForCurrentUser(); applySettings(); loadData(); updateUIState(); closeModal('user-modal');
+    const sn = document.getElementById('settings-current-user-name'); if (sn) sn.innerText = currentUser;
 }
 
 async function confirmDeleteUser(name) {
@@ -1594,7 +1717,7 @@ async function confirmDeleteUser(name) {
 }
 
 async function addUser() { const name = await appPrompt('請輸入新使用者名稱：', '', '新增使用者'); if (name && name.trim() !== '') { if (usersList.includes(name.trim())) return await appAlert('該使用者已存在！', '錯誤'); usersList.push(name.trim()); localStorage.setItem('app_users_list', JSON.stringify(usersList)); switchUser(name.trim()); } }
-async function renameUser() { const newName = await appPrompt('請輸入新的名稱：', currentUser, '重新命名'); if (newName && newName.trim() !== '' && newName !== currentUser) { if (usersList.includes(newName.trim())) return await appAlert('該名稱已存在！', '錯誤'); const oldPrefix = `${currentUser}_`, newPrefix = `${newName.trim()}_`; ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_settings', 'order_last_weather', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits', 'order_campaigns'].forEach(key => { const data = localStorage.getItem(oldPrefix + key); if (data) { localStorage.setItem(newPrefix + key, data); localStorage.removeItem(oldPrefix + key); } }); usersList[usersList.indexOf(currentUser)] = newName.trim(); localStorage.setItem('app_users_list', JSON.stringify(usersList)); currentUser = newName.trim(); localStorage.setItem('app_current_user', currentUser); updateUIState(); await appAlert('重新命名成功！', '成功'); } }
+async function renameUser() { const newName = await appPrompt('請輸入新的名稱：', currentUser, '重新命名'); if (newName && newName.trim() !== '' && newName.trim() !== currentUser) { if (usersList.includes(newName.trim())) return await appAlert('該名稱已存在！', '錯誤'); const oldPrefix = `${currentUser}_`, newPrefix = `${newName.trim()}_`; ['order_active_timers', 'order_history_records', 'order_tips', 'order_costs', 'order_settings', 'order_last_weather', 'order_active_shift', 'order_shifts', 'order_active_wait', 'order_waits', 'order_campaigns'].forEach(key => { const data = localStorage.getItem(oldPrefix + key); if (data) { localStorage.setItem(newPrefix + key, data); localStorage.removeItem(oldPrefix + key); } }); usersList[usersList.indexOf(currentUser)] = newName.trim(); localStorage.setItem('app_users_list', JSON.stringify(usersList)); currentUser = newName.trim(); localStorage.setItem('app_current_user', currentUser); updateUIState(); const sn = document.getElementById('settings-current-user-name'); if (sn) sn.innerText = currentUser; await appAlert('重新命名成功！', '成功'); } }
 
 /* ================== 計時器與打卡邏輯 ================== */
 function toggleShift() {
@@ -1999,7 +2122,8 @@ function renderDailyDetail() {
         document.getElementById('daily-detail-amount').innerText = fmtMoney(dailyRecords.reduce((s,r)=>s+r.amount,0) + dailyBonusTotal);
         document.getElementById('daily-detail-amount').style.color = 'var(--success)';
         
-        let totalShiftMins = shiftRecords.filter(r => r.dateKey === dateKey).reduce((s,r) => s + r.durationMins, 0) + (activeShift && getDateKey(activeShift.startTime) === dateKey ? Math.floor((Date.now() - activeShift.startTime) / 60000) : 0);
+        const dayStart = new Date(currentDailyDateObj); dayStart.setHours(0, 0, 0, 0);
+        let totalShiftMins = getShiftMinutesBetween(dayStart.getTime(), dayStart.getTime() + 86399999);
         const dailyWaits = waitRecords.filter(r => r.dateKey === dateKey);
         let totalWaitMins = dailyWaits.reduce((s,r) => s + r.durationMins, 0), maxWaitMins = dailyWaits.length > 0 ? Math.max(...dailyWaits.map(r=>r.durationMins)) : 0;
         if (activeWait && getDateKey(activeWait.startTime) === dateKey) { const currWait = Math.floor((Date.now() - activeWait.startTime) / 60000); totalWaitMins += currWait; maxWaitMins = Math.max(maxWaitMins, currWait); }
@@ -2091,10 +2215,21 @@ function calcDailyRange() {
     showRangeResult(list.length, list.reduce((sum, r) => sum + r.amount, 0), null);
 }
 
+// 單日明細上方總額 (修改 / 刪除紀錄後也會同步更新)
+function updateDailyDetailAmount() {
+    const dateKey = getDateKey(currentDailyDateObj.getTime());
+    let total = 0;
+    if (currentDailyContext === 'income') total = historyRecords.filter(r => r.dateKey === dateKey).reduce((s, r) => s + r.amount, 0) + getCampaignBonusRecords().filter(b => b.dateKey === dateKey).reduce((s, b) => s + b.amount, 0);
+    else if (currentDailyContext === 'tip') total = tipRecords.filter(r => r.dateKey === dateKey).reduce((s, r) => s + r.amount, 0);
+    else if (currentDailyContext === 'cost') total = costRecords.filter(r => r.dateKey === dateKey).reduce((s, r) => s + r.amount, 0);
+    document.getElementById('daily-detail-amount').innerText = fmtMoney(total);
+}
+
 function renderDailyDetailList() {
     const listContainer = document.getElementById('daily-detail-list');
     const dateKey = getDateKey(currentDailyDateObj.getTime());
     let html = '';
+    updateDailyDetailAmount();
     
     if (currentDailyContext === 'income') {
         const allDaily = historyRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
@@ -2127,7 +2262,7 @@ function renderDailyDetailList() {
     } else if (currentDailyContext === 'cost') {
         const dailyRecords = costRecords.filter(r => r.dateKey === dateKey).sort((a,b)=>b.timestamp - a.timestamp);
         if (dailyRecords.length === 0) html = '<div class="empty-state">今日無成本紀錄</div>';
-        else dailyRecords.forEach(r => { let tags = `<span class="tag">${r.type}</span>`; if((r.type === '保養維修' || r.type === '加油') && r.mileage) tags += `<span class="tag">里程:${fmtNum(r.mileage)}</span>`; html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('cost', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr} ${tags}</div><div class="record-desc">${r.memo || '無備註'}</div></div><div class="record-amount" style="color:var(--text-main);">- ${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteCost('${r.id}')">刪除</div></div></div>`; });
+        else dailyRecords.forEach(r => { let tags = `<span class="tag">${r.type}</span>`; if((r.type === '保養維修' || r.type === '加油') && r.mileage) tags += `<span class="tag">里程:${fmtNum(r.mileage)}</span>`; html += `<div class="swipe-container record-swipe-container"><div class="swipe-content record-swipe-content" ontouchstart="handleItemTouchStart(event)" ontouchmove="handleItemTouchMove(event)" ontouchend="handleItemTouchEnd(event)" ontouchcancel="handleItemTouchEnd(event)"><div class="swipe-edit" onclick="openEdit('cost', '${r.id}')">編輯</div><div class="record-info"><div class="record-time">${r.timeStr} ${tags}</div><div class="record-desc">${r.memo ? escapeHtml(r.memo) : '無備註'}</div></div><div class="record-amount" style="color:var(--text-main);">- ${fmtMoney(r.amount)}</div><div class="swipe-delete" onclick="deleteCost('${r.id}')">刪除</div></div></div>`; });
     }
     listContainer.innerHTML = html;
     if (currentDailyContext === 'income') { if (rangeCalcIsCustom) calcDailyRange(); else resetRangeCalc(); }
@@ -2138,7 +2273,7 @@ function openEdit(category, id) { closeAllSwipes(); document.getElementById('edi
 async function saveEdit() { const id = document.getElementById('edit-id').value, category = document.getElementById('edit-category').value, amount = Number(document.getElementById('edit-amount').value); if (!amount || amount <= 0) return await appAlert('請輸入有效金額', '輸入錯誤'); if (category === 'tip') { const idx = tipRecords.findIndex(t => t.id === id); if(idx > -1) { tipRecords[idx].amount = amount; tipRecords[idx].method = document.getElementById('edit-tip-method').value; localStorage.setItem(getStoreKey('order_tips'), JSON.stringify(tipRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } else { const idx = costRecords.findIndex(t => t.id === id); if(idx > -1) { const type = document.getElementById('edit-cost-type').value; costRecords[idx].amount = amount; costRecords[idx].type = type; costRecords[idx].memo = document.getElementById('edit-cost-memo').value; costRecords[idx].mileage = (type === '保養維修' || type === '加油') ? document.getElementById('edit-cost-mileage').value : ''; localStorage.setItem(getStoreKey('order_costs'), JSON.stringify(costRecords)); renderWeeklyData(); if(document.getElementById('view-daily-detail').classList.contains('active')) renderDailyDetailList(); } } closeModal('edit-modal'); }
 
 let currentCalDate = new Date(), calSelStart = null, calSelEnd = null;
-function openFilterModal() { pushHistory(); const today = new Date(); today.setHours(0, 0, 0, 0); calSelStart = today.getTime(); calSelEnd = null; currentCalDate = new Date(today); renderCalendar(); /* 預設選取今天 */ document.getElementById('filter-modal').classList.add('active'); } 
+function openFilterModal() { const today = new Date(); today.setHours(0, 0, 0, 0); calSelStart = today.getTime(); calSelEnd = null; currentCalDate = new Date(today); renderCalendar(); /* 預設選取今天 */ document.getElementById('filter-modal').classList.add('active'); } 
 function closeModal(id) { document.getElementById(id).classList.remove('active'); } 
 function calPrevMonth() { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); } 
 function calNextMonth() { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); }
@@ -2181,6 +2316,7 @@ async function applyFilter() {
     renderStats(fInc.concat(fBonus), 'search-income-list'); 
     renderTips(fTip, 'search-tips-list'); 
     renderCosts(fCost, 'search-costs-list'); 
+    if (!isSearchResultOpen && !convertOverlayEntry('filter-modal', {})) pushHistory(); // 月曆的返回紀錄轉為查詢結果的返回紀錄
     closeModal('filter-modal'); 
     isSearchResultOpen = true; 
     document.getElementById('view-search-result').classList.add('active'); 
@@ -2217,7 +2353,10 @@ function getPunctualityStats(records, startMs, endMs, buffer) {
 }
 
 function calculatePunctuality() {
-    const buffer = Number(document.getElementById('rate-buffer-time').value) || 0;
+    const bufferEl = document.getElementById('rate-buffer-time');
+    if (bufferEl.dataset.loaded !== currentUser) { bufferEl.dataset.loaded = currentUser; if (settings.punctualityBuffer !== undefined) bufferEl.value = settings.punctualityBuffer; }
+    const buffer = Number(bufferEl.value) || 0;
+    if (settings.punctualityBuffer !== bufferEl.value) { settings.punctualityBuffer = bufferEl.value; saveSettings(); } // 記住合理彈性時間
     const now = Date.now();
     
     const anchor = new Date(2026, 7, 17).setHours(0,0,0,0);
@@ -2287,5 +2426,5 @@ async function clearAllData() {
     await appAlert('已清除當前使用者的所有紀錄。', '完成');
 }
 
-function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); URL.revokeObjectURL(url); }
-function importData(event) { const file = event.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || k.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
+function exportData() { const data = {}; for(let i=0; i<localStorage.length; i++){ const key = localStorage.key(i); if(key.includes('order_') || key.includes('app_')) data[key] = localStorage.getItem(key); } const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'), d = new Date(); a.href = url; a.download = `訂單統計備份_${d.getFullYear()}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getDate().toString().padStart(2,'0')}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 3000); } // 延後釋放，避免部分 Android 下載失敗
+function importData(event) { const file = event.target.files[0]; event.target.value = ''; /* 允許再次選同一個檔案 */ if(!file) return; const reader = new FileReader(); reader.onload = async function(e) { try { const data = JSON.parse(e.target.result); if (!data || typeof data !== 'object' || !Object.keys(data).some(k => k.includes('order_') || k.includes('app_'))) return await appAlert('無效的備份檔案格式。', '匯入失敗'); if (!(await appConfirm('匯入會用備份檔覆蓋目前手機上相同的資料，確定要匯入嗎？\n建議先「匯出資料」備份一次。', '匯入確認', true))) return; let valid = false; Object.keys(data).forEach(k => { if(k.includes('order_') || k.includes('app_')) { localStorage.setItem(k, data[k]); valid = true; } }); if(valid) { await appAlert('資料匯入成功！即將重新載入頁面。', '匯入成功'); location.reload(); } else await appAlert('無效的備份檔案格式。', '匯入失敗'); } catch(err) { await appAlert('匯入失敗：檔案損毀或格式錯誤。', '錯誤'); } }; reader.readAsText(file); }
