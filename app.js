@@ -421,36 +421,25 @@ window.onload = function() {
 };
 
 /* ================== MapLibre GL 向量地圖引擎 ================== */
+// 縣道 / 鄉道編號外框：以 2 倍解析度繪製 (pixelRatio: 2)，框更小、線條更細更清晰
+const SHIELD_RATIO = 2;
 function generateShieldIcon() {
-    const width = 64;
-    const height = 36;
+    const R = SHIELD_RATIO;
+    const width = 24 * R, height = 16 * R;          // 實際顯示約 24 × 16，會依文字自動伸縮
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = width; canvas.height = height;
     const ctx = canvas.getContext('2d');
-
-    const r = 4;
-    const x = 1.5, y = 1.5, w = width - 3, h = height - 3;
-
+    const lw = 1.1 * R, r = 2.5 * R;
+    const x = lw / 2, y = lw / 2, w = width - lw, h = height - lw;
     ctx.beginPath();
     ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
     ctx.closePath();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = '#1e293b';
-    ctx.stroke();
-
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.lineWidth = lw; ctx.strokeStyle = '#1e293b'; ctx.stroke();
     return ctx.getImageData(0, 0, width, height);
 }
 
@@ -490,9 +479,10 @@ function initMap() {
 
     mapInstance.on('load', () => {
         mapInstance.addImage('shield-box', generateShieldIcon(), {
-            content: [6, 6, 58, 30],
-            stretchX: [[14, 50]],
-            stretchY: [[10, 26]]
+            pixelRatio: SHIELD_RATIO,
+            content: [3 * SHIELD_RATIO, 2 * SHIELD_RATIO, 21 * SHIELD_RATIO, 14 * SHIELD_RATIO],  // 文字與外框的內距 (左右 3、上下 2)
+            stretchX: [[4 * SHIELD_RATIO, 20 * SHIELD_RATIO]],
+            stretchY: [[4 * SHIELD_RATIO, 12 * SHIELD_RATIO]]
         });
 
         const layers = mapInstance.getStyle().layers;
@@ -589,16 +579,16 @@ function initMap() {
                 'text-field': ['get', 'ref'],
                 'text-size': [
                     'interpolate', ['linear'], ['zoom'],
-                    12, 9.5,
-                    15, 10.5,
-                    18, 12.5
+                    12, 8.5,
+                    15, 9.5,
+                    18, 11
                 ],
                 'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
                 'text-rotation-alignment': 'viewport',
                 'text-pitch-alignment': 'viewport',
                 'icon-image': 'shield-box',
                 'icon-text-fit': 'both',
-                'icon-text-fit-padding': [1.5, 3.5, 1.5, 3.5],
+                'icon-text-fit-padding': [0, 0.5, 0, 0.5],
                 'icon-rotation-alignment': 'viewport',
                 'symbol-spacing': 260
             },
